@@ -16,7 +16,10 @@ impl MainLayout {
         settings: Entity<SettingsState>,
         cx: &mut Context<Self>,
     ) -> Self {
-        let left_panel = cx.new(|cx| LeftPanel::new(git_state.clone(), cx));
+        let settings_clone = settings.clone();
+        let left_panel = cx.new(|cx| {
+            LeftPanel::new(git_state.clone(), cx).with_settings(settings_clone)
+        });
 
         // Observe git state changes
         cx.observe(&git_state, |_this, _git_state, cx| {

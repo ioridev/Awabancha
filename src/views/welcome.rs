@@ -1,11 +1,13 @@
+use crate::actions::OpenRepository;
 use crate::state::RecentProjects;
 use gpui::prelude::*;
 use gpui::*;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 pub struct WelcomeView {
     recent_projects: Entity<RecentProjects>,
-    on_open_repository: Option<Box<dyn Fn(&PathBuf, &mut Window, &mut App) + 'static>>,
+    on_open_repository: Option<Arc<dyn Fn(&PathBuf, &mut Window, &mut App) + Send + Sync + 'static>>,
 }
 
 impl WelcomeView {
@@ -18,9 +20,9 @@ impl WelcomeView {
 
     pub fn on_open_repository(
         mut self,
-        handler: impl Fn(&PathBuf, &mut Window, &mut App) + 'static,
+        handler: impl Fn(&PathBuf, &mut Window, &mut App) + Send + Sync + 'static,
     ) -> Self {
-        self.on_open_repository = Some(Box::new(handler));
+        self.on_open_repository = Some(Arc::new(handler));
         self
     }
 }
@@ -37,6 +39,7 @@ impl RenderOnce for WelcomeView {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let recent = self.recent_projects.read(cx);
         let projects: Vec<_> = recent.projects().to_vec();
+        let on_open = self.on_open_repository.clone();
 
         div()
             .flex()
@@ -66,7 +69,7 @@ impl RenderOnce for WelcomeView {
                             .child("A fast Git GUI client"),
                     ),
             )
-            // Open Repository Button
+            // Open Repository Button - dispatches OpenRepository action
             .child(
                 div()
                     .id("open-repo-button")
@@ -79,7 +82,10 @@ impl RenderOnce for WelcomeView {
                     .cursor_pointer()
                     .hover(|s| s.bg(rgb(0xb4befe)))
                     .active(|s| s.bg(rgb(0x7287fd)))
-                    .child("Open Repository"),
+                    .child("Open Repository")
+                    .on_click(|_event, window, _cx| {
+                        window.dispatch_action(Box::new(OpenRepository), _cx);
+                    }),
             )
             // Recent Projects
             .child(
@@ -98,6 +104,8 @@ impl RenderOnce for WelcomeView {
                         )
                     })
                     .children(projects.into_iter().map(|project| {
+                        let path = project.path.clone();
+                        let on_open_clone = on_open.clone();
                         div()
                             .id(ElementId::Name(
                                 format!("recent-{}", project.path.display()).into(),
@@ -111,6 +119,11 @@ impl RenderOnce for WelcomeView {
                             .cursor_pointer()
                             .bg(rgb(0x313244))
                             .hover(|s| s.bg(rgb(0x45475a)))
+                            .on_click(move |_event, window, cx| {
+                                if let Some(ref handler) = on_open_clone {
+                                    handler(&path, window, cx);
+                                }
+                            })
                             .child(
                                 div()
                                     .flex()
