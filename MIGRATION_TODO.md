@@ -369,21 +369,24 @@ Migration from VibeWithGraph (Tauri + React) to Awabancha (Rust + gpui)
 | Welcome screen | 🟢 Done | Recent projects, open button, drag-drop |
 | Git repository ops | 🟢 Done | git2 integration |
 | File status ops | 🟢 Done | stage/unstage/discard |
-| Commit ops | 🟢 Done | create/amend |
+| Commit ops | 🟢 Done | create/amend with message loading |
 | Branch ops | 🟢 Done | checkout/create/delete |
 | Remote ops | 🟢 Done | push/pull/fetch |
 | Advanced ops | 🟢 Done | revert/cherry-pick/reset |
 | Main layout | 🟢 Done | 3-panel with header |
-| Left panel | 🟢 Done | File list + commit form |
-| Right panel | 🟢 Done | Commit graph |
+| Left panel | 🟢 Done | File list + commit form + stash |
+| Right panel | 🟢 Done | Commit graph + search |
 | Commit graph | 🟢 Done | Visual graph with branches |
+| Context menu | 🟢 Done | Checkout, branch/tag inline forms, cherry-pick, revert, reset |
 | Diff viewer | 🟢 Done | Line-by-line diff, modal on double-click |
-| Settings | 🟢 Done | Auth mode, about section, keyboard shortcuts |
+| Settings | 🟢 Done | Auth mode, merge options, keyboard shortcuts |
 | Conflict resolution | 🟢 Done | git2 conflict APIs, modal dialog |
 | Keyboard shortcuts | 🟢 Done | Actions registered |
 | File watching | 🟢 Done | Auto-refresh on changes |
 | Window focus refresh | 🟢 Done | Auto-refresh on window activation |
 | Drag & Drop | 🟢 Done | Open repos via file drop |
+| Toast notifications | 🟢 Done | Success/error feedback with auto-dismiss |
+| Commit search | 🟢 Done | Search by message, author, SHA |
 | i18n | 🔴 Not Started | Future |
 
 **Legend:** 🟢 Done | 🟡 Partial | 🔴 Not Started
