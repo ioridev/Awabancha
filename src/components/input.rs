@@ -9,6 +9,12 @@ use gpui::*;
 use std::ops::Range;
 use unicode_segmentation::UnicodeSegmentation;
 
+/// Event emitted when text input content changes
+#[derive(Clone, Debug)]
+pub struct TextInputChanged(pub SharedString);
+
+impl EventEmitter<TextInputChanged> for TextInputView {}
+
 /// A text input view that handles keyboard input, selection, and clipboard
 pub struct TextInputView {
     focus_handle: FocusHandle,
@@ -81,6 +87,7 @@ impl TextInputView {
         self.content = content;
         self.selected_range = len..len;
         self.marked_range = None;
+        self.emit_change(cx);
         cx.notify();
     }
 
@@ -185,6 +192,11 @@ impl TextInputView {
         if let Some(on_change) = &self.on_change {
             on_change(&self.content, window, cx);
         }
+    }
+
+    /// Emit content change event for subscribers
+    fn emit_change(&self, cx: &mut Context<Self>) {
+        cx.emit(TextInputChanged(self.content.clone()));
     }
 
     // Action handlers
@@ -378,6 +390,7 @@ impl EntityInputHandler for TextInputView {
         self.selected_range = range.start + new_text.len()..range.start + new_text.len();
         self.marked_range.take();
         self.notify_change(window, cx);
+        self.emit_change(cx);
         cx.notify();
     }
 
@@ -410,6 +423,7 @@ impl EntityInputHandler for TextInputView {
             .unwrap_or_else(|| range.start + new_text.len()..range.start + new_text.len());
 
         self.notify_change(window, cx);
+        self.emit_change(cx);
         cx.notify();
     }
 

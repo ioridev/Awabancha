@@ -676,4 +676,32 @@ impl GitState {
             cx,
         )
     }
+
+    /// Search commits by message, author, or SHA
+    pub fn search_commits(&self, query: &str, limit: usize) -> Vec<CommitInfo> {
+        let query = query.to_lowercase();
+
+        if query.is_empty() {
+            return Vec::new();
+        }
+
+        // Search in existing commits (loaded in memory)
+        if let Some(commits) = &self.commits {
+            commits
+                .nodes
+                .iter()
+                .filter(|node| {
+                    let commit = &node.commit;
+                    commit.message.to_lowercase().contains(&query)
+                        || commit.author.to_lowercase().contains(&query)
+                        || commit.sha.to_lowercase().starts_with(&query)
+                        || commit.short_sha.to_lowercase().starts_with(&query)
+                })
+                .take(limit)
+                .map(|node| node.commit.clone())
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
 }
