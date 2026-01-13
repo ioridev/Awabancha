@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use crate::components::TextInputView;
 use crate::git::ResetMode;
 use crate::state::GitState;
 use gpui::prelude::*;
@@ -10,10 +11,24 @@ const COLUMN_WIDTH: f32 = 16.0;
 const ROW_HEIGHT: f32 = 32.0;
 const GRAPH_PADDING: f32 = 8.0;
 
+/// What form is currently shown in the context menu
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ContextMenuMode {
+    Normal,
+    CreateBranch,
+    CreateTag,
+}
+
 pub struct CommitGraph {
     git_state: Entity<GitState>,
     /// Context menu state
     context_menu: Option<ContextMenuState>,
+    /// Input for branch name
+    branch_name_input: Entity<TextInputView>,
+    /// Input for tag name
+    tag_name_input: Entity<TextInputView>,
+    /// Input for tag message
+    tag_message_input: Entity<TextInputView>,
 }
 
 #[derive(Clone)]
@@ -21,6 +36,7 @@ struct ContextMenuState {
     sha: String,
     position: Point<Pixels>,
     is_merge_commit: bool,
+    mode: ContextMenuMode,
 }
 
 impl CommitGraph {
@@ -31,9 +47,19 @@ impl CommitGraph {
         })
         .detach();
 
+        // Create input views for forms
+        let branch_name_input =
+            cx.new(|cx| TextInputView::new(cx).with_placeholder("Branch name"));
+        let tag_name_input = cx.new(|cx| TextInputView::new(cx).with_placeholder("Tag name"));
+        let tag_message_input =
+            cx.new(|cx| TextInputView::new(cx).with_placeholder("Message (optional)"));
+
         Self {
             git_state,
             context_menu: None,
+            branch_name_input,
+            tag_name_input,
+            tag_message_input,
         }
     }
 
@@ -44,12 +70,31 @@ impl CommitGraph {
         is_merge_commit: bool,
         cx: &mut Context<Self>,
     ) {
+        // Reset input fields when opening menu
+        self.branch_name_input.update(cx, |input, cx| {
+            input.set_content("", cx);
+        });
+        self.tag_name_input.update(cx, |input, cx| {
+            input.set_content("", cx);
+        });
+        self.tag_message_input.update(cx, |input, cx| {
+            input.set_content("", cx);
+        });
+
         self.context_menu = Some(ContextMenuState {
             sha,
             position,
             is_merge_commit,
+            mode: ContextMenuMode::Normal,
         });
         cx.notify();
+    }
+
+    fn set_context_menu_mode(&mut self, mode: ContextMenuMode, cx: &mut Context<Self>) {
+        if let Some(ref mut menu) = self.context_menu {
+            menu.mode = mode;
+            cx.notify();
+        }
     }
 
     fn hide_context_menu(&mut self, cx: &mut Context<Self>) {
@@ -67,9 +112,12 @@ impl CommitGraph {
     }
 
     fn create_branch_from(&mut self, sha: &str, _window: &mut Window, cx: &mut Context<Self>) {
-        // For now, create a branch with a default name
-        // TODO: Show dialog to input branch name
-        let branch_name = format!("branch-{}", &sha[..7]);
+        // Get branch name from input
+        let branch_name = self.branch_name_input.read(cx).content().to_string();
+        if branch_name.is_empty() {
+            return;
+        }
+
         self.git_state.update(cx, |state, cx| {
             if let Err(e) = state.checkout_commit(sha, cx) {
                 log::error!("Failed to checkout: {}", e);
@@ -83,11 +131,21 @@ impl CommitGraph {
     }
 
     fn create_tag_at(&mut self, sha: &str, _window: &mut Window, cx: &mut Context<Self>) {
-        // For now, create a tag with a default name
-        // TODO: Show dialog to input tag name and message
-        let tag_name = format!("tag-{}", &sha[..7]);
+        // Get tag name and message from inputs
+        let tag_name = self.tag_name_input.read(cx).content().to_string();
+        let tag_message = self.tag_message_input.read(cx).content().to_string();
+        if tag_name.is_empty() {
+            return;
+        }
+
+        let message = if tag_message.is_empty() {
+            None
+        } else {
+            Some(tag_message.as_str())
+        };
+
         self.git_state.update(cx, |state, cx| {
-            if let Err(e) = state.create_tag(&tag_name, sha, None, cx) {
+            if let Err(e) = state.create_tag(&tag_name, sha, message, cx) {
                 log::error!("Failed to create tag: {}", e);
             }
         });
@@ -209,12 +267,13 @@ impl CommitGraph {
         let sha_reset_mixed = sha.clone();
         let sha_reset_hard = sha.clone();
         let is_merge = menu.is_merge_commit;
+        let mode = menu.mode;
 
-        div()
+        let base = div()
             .absolute()
             .left(menu.position.x)
             .top(menu.position.y)
-            .w(px(200.0))
+            .w(px(240.0))
             .rounded_lg()
             .bg(rgb(0x181825))
             .border_1()
@@ -222,142 +281,273 @@ impl CommitGraph {
             .shadow_lg()
             .py_1()
             .flex()
-            .flex_col()
-            // Checkout
-            .child(
-                div()
-                    .id("ctx-checkout")
-                    .px_3()
-                    .py_2()
-                    .text_sm()
-                    .text_color(rgb(0xcdd6f4))
-                    .cursor_pointer()
-                    .hover(|s| s.bg(rgb(0x313244)))
-                    .child("Checkout")
-                    .on_click(cx.listener(move |this, _event, window, cx| {
-                        this.checkout_commit(&sha_checkout, window, cx);
-                    })),
-            )
-            // Create branch
-            .child(
-                div()
-                    .id("ctx-branch")
-                    .px_3()
-                    .py_2()
-                    .text_sm()
-                    .text_color(rgb(0xcdd6f4))
-                    .cursor_pointer()
-                    .hover(|s| s.bg(rgb(0x313244)))
-                    .child("Create Branch")
-                    .on_click(cx.listener(move |this, _event, window, cx| {
-                        this.create_branch_from(&sha_branch, window, cx);
-                    })),
-            )
-            // Create tag
-            .child(
-                div()
-                    .id("ctx-tag")
-                    .px_3()
-                    .py_2()
-                    .text_sm()
-                    .text_color(rgb(0xcdd6f4))
-                    .cursor_pointer()
-                    .hover(|s| s.bg(rgb(0x313244)))
-                    .child("Create Tag")
-                    .on_click(cx.listener(move |this, _event, window, cx| {
-                        this.create_tag_at(&sha_tag, window, cx);
-                    })),
-            )
-            // Separator
-            .child(div().h_px().bg(rgb(0x313244)).my_1())
-            // Cherry-pick
-            .child(
-                div()
-                    .id("ctx-cherry-pick")
-                    .px_3()
-                    .py_2()
-                    .text_sm()
-                    .text_color(rgb(0xcdd6f4))
-                    .cursor_pointer()
-                    .hover(|s| s.bg(rgb(0x313244)))
-                    .child("Cherry-pick")
-                    .on_click(cx.listener(move |this, _event, window, cx| {
-                        this.cherry_pick(&sha_cherry, window, cx);
-                    })),
-            )
-            // Revert
-            .child(
-                div()
-                    .id("ctx-revert")
-                    .px_3()
-                    .py_2()
-                    .text_sm()
-                    .text_color(rgb(0xcdd6f4))
-                    .cursor_pointer()
-                    .hover(|s| s.bg(rgb(0x313244)))
-                    .child(if is_merge {
-                        "Revert (mainline 1)"
-                    } else {
-                        "Revert"
-                    })
-                    .on_click(cx.listener(move |this, _event, window, cx| {
-                        let mainline = if is_merge { Some(1) } else { None };
-                        this.revert_commit(&sha_revert, mainline, window, cx);
-                    })),
-            )
-            // Separator
-            .child(div().h_px().bg(rgb(0x313244)).my_1())
-            // Reset submenu
-            .child(
-                div()
-                    .text_xs()
-                    .text_color(rgb(0x6c7086))
-                    .px_3()
-                    .py_1()
-                    .child("Reset to this commit:"),
-            )
-            .child(
-                div()
-                    .id("ctx-reset-soft")
-                    .px_3()
-                    .py_2()
-                    .text_sm()
-                    .text_color(rgb(0xa6e3a1))
-                    .cursor_pointer()
-                    .hover(|s| s.bg(rgb(0x313244)))
-                    .child("Soft (keep changes staged)")
-                    .on_click(cx.listener(move |this, _event, window, cx| {
-                        this.reset_to_commit(&sha_reset_soft, ResetMode::Soft, window, cx);
-                    })),
-            )
-            .child(
-                div()
-                    .id("ctx-reset-mixed")
-                    .px_3()
-                    .py_2()
-                    .text_sm()
-                    .text_color(rgb(0xf9e2af))
-                    .cursor_pointer()
-                    .hover(|s| s.bg(rgb(0x313244)))
-                    .child("Mixed (keep changes unstaged)")
-                    .on_click(cx.listener(move |this, _event, window, cx| {
-                        this.reset_to_commit(&sha_reset_mixed, ResetMode::Mixed, window, cx);
-                    })),
-            )
-            .child(
-                div()
-                    .id("ctx-reset-hard")
-                    .px_3()
-                    .py_2()
-                    .text_sm()
-                    .text_color(rgb(0xf38ba8))
-                    .cursor_pointer()
-                    .hover(|s| s.bg(rgb(0x313244)))
-                    .child("Hard (discard all changes)")
-                    .on_click(cx.listener(move |this, _event, window, cx| {
-                        this.reset_to_commit(&sha_reset_hard, ResetMode::Hard, window, cx);
-                    })),
-            )
+            .flex_col();
+
+        match mode {
+            ContextMenuMode::CreateBranch => {
+                // Branch creation form
+                base.child(
+                    div()
+                        .px_3()
+                        .py_2()
+                        .text_xs()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(rgb(0x89b4fa))
+                        .child("Create Branch"),
+                )
+                .child(
+                    div()
+                        .px_3()
+                        .py_2()
+                        .child(self.branch_name_input.clone()),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .gap_2()
+                        .px_3()
+                        .py_2()
+                        .child(
+                            div()
+                                .id("ctx-branch-create")
+                                .flex_1()
+                                .px_3()
+                                .py_1()
+                                .rounded_md()
+                                .bg(rgb(0x89b4fa))
+                                .text_sm()
+                                .text_color(rgb(0x1e1e2e))
+                                .text_center()
+                                .cursor_pointer()
+                                .hover(|s| s.bg(rgb(0xb4befe)))
+                                .child("Create")
+                                .on_click(cx.listener(move |this, _event, window, cx| {
+                                    this.create_branch_from(&sha_branch, window, cx);
+                                })),
+                        )
+                        .child(
+                            div()
+                                .id("ctx-branch-cancel")
+                                .px_3()
+                                .py_1()
+                                .rounded_md()
+                                .bg(rgb(0x313244))
+                                .text_sm()
+                                .text_color(rgb(0xcdd6f4))
+                                .cursor_pointer()
+                                .hover(|s| s.bg(rgb(0x45475a)))
+                                .child("Cancel")
+                                .on_click(cx.listener(|this, _event, _window, cx| {
+                                    this.set_context_menu_mode(ContextMenuMode::Normal, cx);
+                                })),
+                        ),
+                )
+            }
+            ContextMenuMode::CreateTag => {
+                // Tag creation form
+                base.child(
+                    div()
+                        .px_3()
+                        .py_2()
+                        .text_xs()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(rgb(0xf9e2af))
+                        .child("Create Tag"),
+                )
+                .child(
+                    div()
+                        .px_3()
+                        .py_1()
+                        .child(self.tag_name_input.clone()),
+                )
+                .child(
+                    div()
+                        .px_3()
+                        .py_1()
+                        .child(self.tag_message_input.clone()),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .gap_2()
+                        .px_3()
+                        .py_2()
+                        .child(
+                            div()
+                                .id("ctx-tag-create")
+                                .flex_1()
+                                .px_3()
+                                .py_1()
+                                .rounded_md()
+                                .bg(rgb(0xf9e2af))
+                                .text_sm()
+                                .text_color(rgb(0x1e1e2e))
+                                .text_center()
+                                .cursor_pointer()
+                                .hover(|s| s.bg(rgb(0xfab387)))
+                                .child("Create")
+                                .on_click(cx.listener(move |this, _event, window, cx| {
+                                    this.create_tag_at(&sha_tag, window, cx);
+                                })),
+                        )
+                        .child(
+                            div()
+                                .id("ctx-tag-cancel")
+                                .px_3()
+                                .py_1()
+                                .rounded_md()
+                                .bg(rgb(0x313244))
+                                .text_sm()
+                                .text_color(rgb(0xcdd6f4))
+                                .cursor_pointer()
+                                .hover(|s| s.bg(rgb(0x45475a)))
+                                .child("Cancel")
+                                .on_click(cx.listener(|this, _event, _window, cx| {
+                                    this.set_context_menu_mode(ContextMenuMode::Normal, cx);
+                                })),
+                        ),
+                )
+            }
+            ContextMenuMode::Normal => {
+                // Normal menu items
+                base
+                    // Checkout
+                    .child(
+                        div()
+                            .id("ctx-checkout")
+                            .px_3()
+                            .py_2()
+                            .text_sm()
+                            .text_color(rgb(0xcdd6f4))
+                            .cursor_pointer()
+                            .hover(|s| s.bg(rgb(0x313244)))
+                            .child("Checkout")
+                            .on_click(cx.listener(move |this, _event, window, cx| {
+                                this.checkout_commit(&sha_checkout, window, cx);
+                            })),
+                    )
+                    // Create branch (opens form)
+                    .child(
+                        div()
+                            .id("ctx-branch")
+                            .px_3()
+                            .py_2()
+                            .text_sm()
+                            .text_color(rgb(0xcdd6f4))
+                            .cursor_pointer()
+                            .hover(|s| s.bg(rgb(0x313244)))
+                            .child("Create Branch...")
+                            .on_click(cx.listener(|this, _event, _window, cx| {
+                                this.set_context_menu_mode(ContextMenuMode::CreateBranch, cx);
+                            })),
+                    )
+                    // Create tag (opens form)
+                    .child(
+                        div()
+                            .id("ctx-tag")
+                            .px_3()
+                            .py_2()
+                            .text_sm()
+                            .text_color(rgb(0xcdd6f4))
+                            .cursor_pointer()
+                            .hover(|s| s.bg(rgb(0x313244)))
+                            .child("Create Tag...")
+                            .on_click(cx.listener(|this, _event, _window, cx| {
+                                this.set_context_menu_mode(ContextMenuMode::CreateTag, cx);
+                            })),
+                    )
+                    // Separator
+                    .child(div().h_px().bg(rgb(0x313244)).my_1())
+                    // Cherry-pick
+                    .child(
+                        div()
+                            .id("ctx-cherry-pick")
+                            .px_3()
+                            .py_2()
+                            .text_sm()
+                            .text_color(rgb(0xcdd6f4))
+                            .cursor_pointer()
+                            .hover(|s| s.bg(rgb(0x313244)))
+                            .child("Cherry-pick")
+                            .on_click(cx.listener(move |this, _event, window, cx| {
+                                this.cherry_pick(&sha_cherry, window, cx);
+                            })),
+                    )
+                    // Revert
+                    .child(
+                        div()
+                            .id("ctx-revert")
+                            .px_3()
+                            .py_2()
+                            .text_sm()
+                            .text_color(rgb(0xcdd6f4))
+                            .cursor_pointer()
+                            .hover(|s| s.bg(rgb(0x313244)))
+                            .child(if is_merge {
+                                "Revert (mainline 1)"
+                            } else {
+                                "Revert"
+                            })
+                            .on_click(cx.listener(move |this, _event, window, cx| {
+                                let mainline = if is_merge { Some(1) } else { None };
+                                this.revert_commit(&sha_revert, mainline, window, cx);
+                            })),
+                    )
+                    // Separator
+                    .child(div().h_px().bg(rgb(0x313244)).my_1())
+                    // Reset submenu
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(rgb(0x6c7086))
+                            .px_3()
+                            .py_1()
+                            .child("Reset to this commit:"),
+                    )
+                    .child(
+                        div()
+                            .id("ctx-reset-soft")
+                            .px_3()
+                            .py_2()
+                            .text_sm()
+                            .text_color(rgb(0xa6e3a1))
+                            .cursor_pointer()
+                            .hover(|s| s.bg(rgb(0x313244)))
+                            .child("Soft (keep changes staged)")
+                            .on_click(cx.listener(move |this, _event, window, cx| {
+                                this.reset_to_commit(&sha_reset_soft, ResetMode::Soft, window, cx);
+                            })),
+                    )
+                    .child(
+                        div()
+                            .id("ctx-reset-mixed")
+                            .px_3()
+                            .py_2()
+                            .text_sm()
+                            .text_color(rgb(0xf9e2af))
+                            .cursor_pointer()
+                            .hover(|s| s.bg(rgb(0x313244)))
+                            .child("Mixed (keep changes unstaged)")
+                            .on_click(cx.listener(move |this, _event, window, cx| {
+                                this.reset_to_commit(&sha_reset_mixed, ResetMode::Mixed, window, cx);
+                            })),
+                    )
+                    .child(
+                        div()
+                            .id("ctx-reset-hard")
+                            .px_3()
+                            .py_2()
+                            .text_sm()
+                            .text_color(rgb(0xf38ba8))
+                            .cursor_pointer()
+                            .hover(|s| s.bg(rgb(0x313244)))
+                            .child("Hard (discard all changes)")
+                            .on_click(cx.listener(move |this, _event, window, cx| {
+                                this.reset_to_commit(&sha_reset_hard, ResetMode::Hard, window, cx);
+                            })),
+                    )
+            }
+        }
     }
 }
 
