@@ -2,6 +2,7 @@ mod actions;
 mod app;
 mod components;
 mod git;
+mod i18n;
 mod state;
 mod views;
 

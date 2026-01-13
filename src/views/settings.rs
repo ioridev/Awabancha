@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use crate::i18n::{t, Locale};
 use crate::state::{AuthMode, MergeMode, SettingsState};
 use gpui::prelude::*;
 use gpui::*;
@@ -25,6 +26,7 @@ impl IntoElement for SettingsView {
 impl RenderOnce for SettingsView {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let settings = self.settings.read(cx);
+        let locale = settings.data.locale;
         let auth_mode = settings.data.git_auth_mode;
         let merge_mode = settings.data.merge_mode;
         let username = settings.data.git_username.clone().unwrap_or_default();
@@ -64,7 +66,7 @@ impl RenderOnce for SettingsView {
                                     .text_sm()
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .text_color(rgb(0xcdd6f4))
-                                    .child("Settings"),
+                                    .child(t(locale, "settings.title")),
                             )
                             .child(
                                 div()
@@ -89,6 +91,40 @@ impl RenderOnce for SettingsView {
                             .flex()
                             .flex_col()
                             .gap_6()
+                            // Language section
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap_3()
+                                    .child(
+                                        div()
+                                            .text_xs()
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .text_color(rgb(0x89b4fa))
+                                            .child(t(locale, "settings.general")),
+                                    )
+                                    .child(
+                                        div()
+                                            .flex()
+                                            .items_center()
+                                            .justify_between()
+                                            .child(
+                                                div()
+                                                    .text_sm()
+                                                    .text_color(rgb(0x9399b2))
+                                                    .child(t(locale, "settings.language")),
+                                            )
+                                            .child(
+                                                div()
+                                                    .flex()
+                                                    .gap_1()
+                                                    .children(Locale::all().iter().map(|l| {
+                                                        LanguageButton::new(*l, locale == *l)
+                                                    })),
+                                            ),
+                                    ),
+                            )
                             // Git Authentication section
                             .child(
                                 div()
@@ -100,7 +136,7 @@ impl RenderOnce for SettingsView {
                                             .text_xs()
                                             .font_weight(FontWeight::SEMIBOLD)
                                             .text_color(rgb(0x89b4fa))
-                                            .child("Git Authentication"),
+                                            .child(t(locale, "settings.gitAuth")),
                                     )
                                     // Auth Mode selector
                                     .child(
@@ -112,18 +148,18 @@ impl RenderOnce for SettingsView {
                                                 div()
                                                     .text_sm()
                                                     .text_color(rgb(0x9399b2))
-                                                    .child("Auth Mode"),
+                                                    .child(t(locale, "settings.gitAuthMethod")),
                                             )
                                             .child(
                                                 div()
                                                     .flex()
                                                     .gap_2()
                                                     .child(SettingsButton::new(
-                                                        "HTTPS",
+                                                        t(locale, "auth.https"),
                                                         auth_mode == AuthMode::Https,
                                                     ))
                                                     .child(SettingsButton::new(
-                                                        "SSH",
+                                                        t(locale, "auth.ssh"),
                                                         auth_mode == AuthMode::Ssh,
                                                     )),
                                             ),
@@ -139,7 +175,7 @@ impl RenderOnce for SettingsView {
                                                     div()
                                                         .text_sm()
                                                         .text_color(rgb(0x9399b2))
-                                                        .child("Username"),
+                                                        .child(t(locale, "settings.gitUsername")),
                                                 )
                                                 .child(
                                                     div()
@@ -154,7 +190,7 @@ impl RenderOnce for SettingsView {
                                                             rgb(0xcdd6f4)
                                                         })
                                                         .child(if username.is_empty() {
-                                                            "Not set".to_string()
+                                                            t(locale, "settings.gitUsernamePlaceholder")
                                                         } else {
                                                             username
                                                         }),
@@ -172,7 +208,7 @@ impl RenderOnce for SettingsView {
                                                     div()
                                                         .text_sm()
                                                         .text_color(rgb(0x9399b2))
-                                                        .child("Token"),
+                                                        .child(t(locale, "settings.gitToken")),
                                                 )
                                                 .child(
                                                     div()
@@ -187,9 +223,9 @@ impl RenderOnce for SettingsView {
                                                             rgb(0xf38ba8)
                                                         })
                                                         .child(if has_token {
-                                                            "••••••••"
+                                                            "••••••••".to_string()
                                                         } else {
-                                                            "Not set"
+                                                            t(locale, "settings.gitTokenPlaceholder")
                                                         }),
                                                 ),
                                         )
@@ -215,7 +251,7 @@ impl RenderOnce for SettingsView {
                                             .text_xs()
                                             .font_weight(FontWeight::SEMIBOLD)
                                             .text_color(rgb(0x89b4fa))
-                                            .child("Merge Options"),
+                                            .child(t(locale, "settings.merge")),
                                     )
                                     .child(
                                         div()
@@ -226,16 +262,16 @@ impl RenderOnce for SettingsView {
                                                 div()
                                                     .text_sm()
                                                     .text_color(rgb(0x9399b2))
-                                                    .child("Default Strategy"),
+                                                    .child(t(locale, "settings.mergeLabel")),
                                             )
                                             .child(
                                                 div()
                                                     .flex()
                                                     .gap_1()
-                                                    .child(MergeButton::new("Auto", merge_mode == MergeMode::Auto))
+                                                    .child(MergeButton::new(t(locale, "settings.mergeAuto"), merge_mode == MergeMode::Auto))
                                                     .child(MergeButton::new("FF", merge_mode == MergeMode::FfOnly))
                                                     .child(MergeButton::new("No-FF", merge_mode == MergeMode::NoFf))
-                                                    .child(MergeButton::new("Squash", merge_mode == MergeMode::Squash)),
+                                                    .child(MergeButton::new(t(locale, "settings.mergeSquash"), merge_mode == MergeMode::Squash)),
                                             ),
                                     )
                                     .child(
@@ -261,7 +297,7 @@ impl RenderOnce for SettingsView {
                                             .text_xs()
                                             .font_weight(FontWeight::SEMIBOLD)
                                             .text_color(rgb(0x89b4fa))
-                                            .child("About"),
+                                            .child(t(locale, "settings.about")),
                                     )
                                     .child(
                                         div()
@@ -278,7 +314,7 @@ impl RenderOnce for SettingsView {
                                                             .text_lg()
                                                             .font_weight(FontWeight::BOLD)
                                                             .text_color(rgb(0xcdd6f4))
-                                                            .child("Awabancha"),
+                                                            .child(t(locale, "app.name")),
                                                     )
                                                     .child(
                                                         div()
@@ -295,7 +331,7 @@ impl RenderOnce for SettingsView {
                                                 div()
                                                     .text_sm()
                                                     .text_color(rgb(0x6c7086))
-                                                    .child("A fast Git GUI client built with gpui"),
+                                                    .child(t(locale, "app.tagline")),
                                             )
                                             .child(
                                                 div()
@@ -316,7 +352,7 @@ impl RenderOnce for SettingsView {
                                             .text_xs()
                                             .font_weight(FontWeight::SEMIBOLD)
                                             .text_color(rgb(0x89b4fa))
-                                            .child("Keyboard Shortcuts"),
+                                            .child(t(locale, "settings.keyboard")),
                                     )
                                     .child(
                                         div()
@@ -325,14 +361,14 @@ impl RenderOnce for SettingsView {
                                             .gap_1()
                                             .text_xs()
                                             .text_color(rgb(0x9399b2))
-                                            .child(KeyboardShortcut::new("Cmd+O", "Open Repository"))
-                                            .child(KeyboardShortcut::new("Cmd+S", "Stage All"))
-                                            .child(KeyboardShortcut::new("Cmd+Enter", "Commit"))
-                                            .child(KeyboardShortcut::new("Cmd+Shift+P", "Push"))
-                                            .child(KeyboardShortcut::new("Cmd+Shift+L", "Pull"))
-                                            .child(KeyboardShortcut::new("Cmd+R", "Refresh"))
-                                            .child(KeyboardShortcut::new("Cmd+,", "Settings"))
-                                            .child(KeyboardShortcut::new("Escape", "Close Modal")),
+                                            .child(KeyboardShortcut::new("Cmd+O", t(locale, "welcome.openRepo")))
+                                            .child(KeyboardShortcut::new("Cmd+S", t(locale, "fileList.stageAll")))
+                                            .child(KeyboardShortcut::new("Cmd+Enter", t(locale, "commit.button")))
+                                            .child(KeyboardShortcut::new("Cmd+Shift+P", t(locale, "left.push")))
+                                            .child(KeyboardShortcut::new("Cmd+Shift+L", t(locale, "left.pull")))
+                                            .child(KeyboardShortcut::new("Cmd+R", t(locale, "common.refresh")))
+                                            .child(KeyboardShortcut::new("Cmd+,", t(locale, "settings.title")))
+                                            .child(KeyboardShortcut::new("Escape", t(locale, "common.close"))),
                                     ),
                             ),
                     ),
@@ -341,13 +377,16 @@ impl RenderOnce for SettingsView {
 }
 
 struct SettingsButton {
-    label: &'static str,
+    label: String,
     selected: bool,
 }
 
 impl SettingsButton {
-    fn new(label: &'static str, selected: bool) -> Self {
-        Self { label, selected }
+    fn new(label: impl Into<String>, selected: bool) -> Self {
+        Self {
+            label: label.into(),
+            selected,
+        }
     }
 }
 
@@ -383,13 +422,16 @@ impl RenderOnce for SettingsButton {
 }
 
 struct MergeButton {
-    label: &'static str,
+    label: String,
     selected: bool,
 }
 
 impl MergeButton {
-    fn new(label: &'static str, selected: bool) -> Self {
-        Self { label, selected }
+    fn new(label: impl Into<String>, selected: bool) -> Self {
+        Self {
+            label: label.into(),
+            selected,
+        }
     }
 }
 
@@ -424,16 +466,66 @@ impl RenderOnce for MergeButton {
     }
 }
 
+struct LanguageButton {
+    locale: Locale,
+    selected: bool,
+}
+
+impl LanguageButton {
+    fn new(locale: Locale, selected: bool) -> Self {
+        Self { locale, selected }
+    }
+}
+
+impl IntoElement for LanguageButton {
+    type Element = Div;
+
+    fn into_element(self) -> Self::Element {
+        div()
+    }
+}
+
+impl RenderOnce for LanguageButton {
+    fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
+        // Use short labels for the buttons
+        let label = match self.locale {
+            Locale::En => "EN",
+            Locale::Ja => "日本語",
+            Locale::ZhHans => "简体",
+            Locale::ZhHant => "繁體",
+        };
+
+        div()
+            .px_2()
+            .py_1()
+            .rounded_md()
+            .text_xs()
+            .cursor_pointer()
+            .bg(if self.selected {
+                rgb(0x89b4fa)
+            } else {
+                rgb(0x313244)
+            })
+            .text_color(if self.selected {
+                rgb(0x1e1e2e)
+            } else {
+                rgb(0xcdd6f4)
+            })
+            .when(!self.selected, |this| this.hover(|s| s.bg(rgb(0x45475a))))
+            .child(label)
+    }
+}
+
 struct KeyboardShortcut {
     shortcut: &'static str,
-    description: &'static str,
+    description: String,
 }
 
 impl KeyboardShortcut {
-    fn new(shortcut: &'static str, description: &'static str) -> Self {
+    fn new(shortcut: &'static str, description: impl Into<String>) -> Self {
         Self {
             shortcut,
-            description,
+            description: description.into(),
         }
     }
 }

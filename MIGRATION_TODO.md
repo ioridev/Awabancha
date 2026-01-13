@@ -350,9 +350,9 @@ Migration from VibeWithGraph (Tauri + React) to Awabancha (Rust + gpui)
 
 ---
 
-### Phase 13: Internationalization (Future)
+### Phase 13: Internationalization
 
-- [ ] **i18n support**
+- [x] **i18n support**
   - English
   - Japanese
   - Simplified Chinese
@@ -387,7 +387,7 @@ Migration from VibeWithGraph (Tauri + React) to Awabancha (Rust + gpui)
 | Drag & Drop | 🟢 Done | Open repos via file drop |
 | Toast notifications | 🟢 Done | Success/error feedback with auto-dismiss |
 | Commit search | 🟢 Done | Search by message, author, SHA |
-| i18n | 🔴 Not Started | Future |
+| i18n | 🟢 Done | 4 languages (en, ja, zh-Hans, zh-Hant) |
 
 **Legend:** 🟢 Done | 🟡 Partial | 🔴 Not Started
 

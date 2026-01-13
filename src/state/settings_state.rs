@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use crate::i18n::Locale;
 use crate::state::GitCredentials;
 use gpui::*;
 use serde::{Deserialize, Serialize};
@@ -44,20 +45,6 @@ impl Default for Theme {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Language {
-    En,
-    Ja,
-    ZhHans,
-    ZhHant,
-}
-
-impl Default for Language {
-    fn default() -> Self {
-        Self::En
-    }
-}
-
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SettingsData {
     pub git_auth_mode: AuthMode,
@@ -65,7 +52,7 @@ pub struct SettingsData {
     pub git_token: Option<String>,
     pub merge_mode: MergeMode,
     pub theme: Theme,
-    pub language: Language,
+    pub locale: Locale,
 }
 
 impl Default for SettingsData {
@@ -76,7 +63,7 @@ impl Default for SettingsData {
             git_token: None,
             merge_mode: MergeMode::default(),
             theme: Theme::default(),
-            language: Language::default(),
+            locale: Locale::default(),
         }
     }
 }
@@ -152,8 +139,8 @@ impl SettingsState {
         cx.notify();
     }
 
-    pub fn set_language(&mut self, language: Language, cx: &mut Context<Self>) {
-        self.data.language = language;
+    pub fn set_locale(&mut self, locale: Locale, cx: &mut Context<Self>) {
+        self.data.locale = locale;
         self.save(cx);
         cx.notify();
     }
