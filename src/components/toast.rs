@@ -5,6 +5,7 @@ use gpui::prelude::*;
 use gpui::*;
 
 /// A single toast notification component
+#[derive(IntoElement)]
 pub struct Toast {
     message: ToastMessage,
     toast_state: Entity<ToastState>,
@@ -16,14 +17,6 @@ impl Toast {
             message,
             toast_state,
         }
-    }
-}
-
-impl IntoElement for Toast {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
-        self
     }
 }
 
@@ -81,6 +74,7 @@ impl RenderOnce for Toast {
 }
 
 /// Container for all toast notifications
+#[derive(IntoElement)]
 pub struct ToastContainer {
     toast_state: Entity<ToastState>,
 }
@@ -88,14 +82,6 @@ pub struct ToastContainer {
 impl ToastContainer {
     pub fn new(toast_state: Entity<ToastState>) -> Self {
         Self { toast_state }
-    }
-}
-
-impl IntoElement for ToastContainer {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
-        self
     }
 }
 

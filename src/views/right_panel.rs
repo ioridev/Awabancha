@@ -206,6 +206,7 @@ impl Render for RightPanel {
 }
 
 /// A search result item component
+#[derive(IntoElement)]
 struct SearchResultItem {
     commit: CommitInfo,
 }
@@ -213,14 +214,6 @@ struct SearchResultItem {
 impl SearchResultItem {
     fn new(commit: CommitInfo) -> Self {
         Self { commit }
-    }
-}
-
-impl IntoElement for SearchResultItem {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
-        self
     }
 }
 

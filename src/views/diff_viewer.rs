@@ -4,6 +4,7 @@ use crate::git::{DiffLineType, FileDiff};
 use gpui::prelude::*;
 use gpui::*;
 
+#[derive(IntoElement)]
 pub struct DiffViewer {
     diff: FileDiff,
 }
@@ -11,14 +12,6 @@ pub struct DiffViewer {
 impl DiffViewer {
     pub fn new(diff: FileDiff) -> Self {
         Self { diff }
-    }
-}
-
-impl IntoElement for DiffViewer {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
-        self
     }
 }
 
@@ -111,6 +104,7 @@ impl RenderOnce for DiffViewer {
     }
 }
 
+#[derive(IntoElement)]
 pub struct DiffLine {
     line: crate::git::DiffLine,
 }
@@ -118,14 +112,6 @@ pub struct DiffLine {
 impl DiffLine {
     pub fn new(line: crate::git::DiffLine) -> Self {
         Self { line }
-    }
-}
-
-impl IntoElement for DiffLine {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
-        self
     }
 }
 

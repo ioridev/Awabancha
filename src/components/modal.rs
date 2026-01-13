@@ -3,6 +3,7 @@
 use gpui::prelude::*;
 use gpui::*;
 
+#[derive(IntoElement)]
 pub struct Modal {
     title: SharedString,
     content: AnyElement,
@@ -14,14 +15,6 @@ impl Modal {
             title: title.into(),
             content: content.into_any_element(),
         }
-    }
-}
-
-impl IntoElement for Modal {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
-        self
     }
 }
 

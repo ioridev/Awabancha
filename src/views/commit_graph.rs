@@ -551,6 +551,7 @@ impl CommitGraph {
     }
 }
 
+#[derive(IntoElement)]
 pub struct CommitRow {
     node: crate::git::GraphNode,
     row_index: usize,
@@ -564,14 +565,6 @@ impl CommitRow {
             row_index,
             max_column,
         }
-    }
-}
-
-impl IntoElement for CommitRow {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
-        self
     }
 }
 
@@ -666,6 +659,7 @@ impl RenderOnce for CommitRow {
     }
 }
 
+#[derive(IntoElement)]
 pub struct GraphNode {
     column: usize,
     color: u32,
@@ -674,14 +668,6 @@ pub struct GraphNode {
 impl GraphNode {
     pub fn new(column: usize, color: u32) -> Self {
         Self { column, color }
-    }
-}
-
-impl IntoElement for GraphNode {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
-        self
     }
 }
 

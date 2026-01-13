@@ -8,6 +8,7 @@ pub struct DropdownOption {
     pub label: String,
 }
 
+#[derive(IntoElement)]
 pub struct Dropdown {
     options: Vec<DropdownOption>,
     selected: Option<String>,
@@ -30,14 +31,6 @@ impl Dropdown {
 
     pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self {
         self.placeholder = placeholder.into();
-        self
-    }
-}
-
-impl IntoElement for Dropdown {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
         self
     }
 }

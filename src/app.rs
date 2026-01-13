@@ -194,6 +194,10 @@ impl Awabancha {
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        self.open_repository_dialog(cx);
+    }
+
+    fn open_repository_dialog(&mut self, cx: &mut Context<Self>) {
         // Open file dialog via App
         let receiver = cx.prompt_for_paths(PathPromptOptions {
             files: false,
@@ -395,11 +399,13 @@ impl Render for Awabancha {
             .relative()
             .when(self.view_mode == ViewMode::Welcome, |this| {
                 this.child(
-                    WelcomeView::new(recent_projects.clone()).on_open_repository(
-                        cx.listener(|this, path: &PathBuf, _window, cx| {
+                    WelcomeView::new(recent_projects.clone())
+                        .on_open_repository(cx.listener(|this, path: &PathBuf, _window, cx| {
                             this.open_repository(path.clone(), cx);
-                        }),
-                    ),
+                        }))
+                        .on_open_dialog(cx.listener(|this, _: &(), _window, cx| {
+                            this.open_repository_dialog(cx);
+                        })),
                 )
             })
             .when_some(self.main_layout.clone(), |this, main_layout| {

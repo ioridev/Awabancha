@@ -1,13 +1,14 @@
-use crate::actions::OpenRepository;
 use crate::state::RecentProjects;
 use gpui::prelude::*;
 use gpui::*;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+#[derive(IntoElement)]
 pub struct WelcomeView {
     recent_projects: Entity<RecentProjects>,
     on_open_repository: Option<Arc<dyn Fn(&PathBuf, &mut Window, &mut App) + Send + Sync + 'static>>,
+    on_open_dialog: Option<Arc<dyn Fn(&(), &mut Window, &mut App) + Send + Sync + 'static>>,
 }
 
 impl WelcomeView {
@@ -15,6 +16,7 @@ impl WelcomeView {
         Self {
             recent_projects,
             on_open_repository: None,
+            on_open_dialog: None,
         }
     }
 
@@ -23,6 +25,14 @@ impl WelcomeView {
         handler: impl Fn(&PathBuf, &mut Window, &mut App) + Send + Sync + 'static,
     ) -> Self {
         self.on_open_repository = Some(Arc::new(handler));
+        self
+    }
+
+    pub fn on_open_dialog(
+        mut self,
+        handler: impl Fn(&(), &mut Window, &mut App) + Send + Sync + 'static,
+    ) -> Self {
+        self.on_open_dialog = Some(Arc::new(handler));
         self
     }
 
@@ -48,20 +58,13 @@ impl WelcomeView {
     }
 }
 
-impl IntoElement for WelcomeView {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
-        self
-    }
-}
-
 impl RenderOnce for WelcomeView {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let recent = self.recent_projects.read(cx);
         let projects: Vec<_> = recent.projects().to_vec();
         let on_open = self.on_open_repository.clone();
         let on_open_for_drop = on_open.clone();
+        let on_open_dialog = self.on_open_dialog.clone();
 
         div()
             .id("welcome-drop-target")
@@ -122,7 +125,7 @@ impl RenderOnce for WelcomeView {
                     .text_color(rgb(0x6c7086))
                     .child("Drop a git repository folder here"),
             )
-            // Open Repository Button - dispatches OpenRepository action
+            // Open Repository Button
             .child(
                 div()
                     .id("open-repo-button")
@@ -136,8 +139,10 @@ impl RenderOnce for WelcomeView {
                     .hover(|s| s.bg(rgb(0xb4befe)))
                     .active(|s| s.bg(rgb(0x7287fd)))
                     .child("Open Repository")
-                    .on_click(|_event, window, _cx| {
-                        window.dispatch_action(Box::new(OpenRepository), _cx);
+                    .on_click(move |_event, window, cx| {
+                        if let Some(ref handler) = on_open_dialog {
+                            handler(&(), window, cx);
+                        }
                     }),
             )
             // Recent Projects

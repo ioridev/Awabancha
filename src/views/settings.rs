@@ -5,6 +5,7 @@ use crate::state::{AuthMode, MergeMode, SettingsState};
 use gpui::prelude::*;
 use gpui::*;
 
+#[derive(IntoElement)]
 pub struct SettingsView {
     settings: Entity<SettingsState>,
 }
@@ -12,14 +13,6 @@ pub struct SettingsView {
 impl SettingsView {
     pub fn new(settings: Entity<SettingsState>) -> Self {
         Self { settings }
-    }
-}
-
-impl IntoElement for SettingsView {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
-        self
     }
 }
 
@@ -376,6 +369,7 @@ impl RenderOnce for SettingsView {
     }
 }
 
+#[derive(IntoElement)]
 struct SettingsButton {
     label: String,
     selected: bool,
@@ -387,14 +381,6 @@ impl SettingsButton {
             label: label.into(),
             selected,
         }
-    }
-}
-
-impl IntoElement for SettingsButton {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
-        self
     }
 }
 
@@ -421,6 +407,7 @@ impl RenderOnce for SettingsButton {
     }
 }
 
+#[derive(IntoElement)]
 struct MergeButton {
     label: String,
     selected: bool,
@@ -432,14 +419,6 @@ impl MergeButton {
             label: label.into(),
             selected,
         }
-    }
-}
-
-impl IntoElement for MergeButton {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
-        self
     }
 }
 
@@ -466,6 +445,7 @@ impl RenderOnce for MergeButton {
     }
 }
 
+#[derive(IntoElement)]
 struct LanguageButton {
     locale: Locale,
     selected: bool,
@@ -474,14 +454,6 @@ struct LanguageButton {
 impl LanguageButton {
     fn new(locale: Locale, selected: bool) -> Self {
         Self { locale, selected }
-    }
-}
-
-impl IntoElement for LanguageButton {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
-        self
     }
 }
 
@@ -516,6 +488,7 @@ impl RenderOnce for LanguageButton {
     }
 }
 
+#[derive(IntoElement)]
 struct KeyboardShortcut {
     shortcut: &'static str,
     description: String,
@@ -527,14 +500,6 @@ impl KeyboardShortcut {
             shortcut,
             description: description.into(),
         }
-    }
-}
-
-impl IntoElement for KeyboardShortcut {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
-        self
     }
 }
 

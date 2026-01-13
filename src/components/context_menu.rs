@@ -3,6 +3,7 @@
 use gpui::prelude::*;
 use gpui::*;
 
+#[derive(IntoElement)]
 pub struct ContextMenuItem {
     pub label: String,
     pub danger: bool,
@@ -25,14 +26,6 @@ impl ContextMenuItem {
 
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
-        self
-    }
-}
-
-impl IntoElement for ContextMenuItem {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
         self
     }
 }
@@ -61,6 +54,7 @@ impl RenderOnce for ContextMenuItem {
     }
 }
 
+#[derive(IntoElement)]
 pub struct ContextMenu {
     items: Vec<ContextMenuItem>,
     position: Point<Pixels>,
@@ -69,14 +63,6 @@ pub struct ContextMenu {
 impl ContextMenu {
     pub fn new(items: Vec<ContextMenuItem>, position: Point<Pixels>) -> Self {
         Self { items, position }
-    }
-}
-
-impl IntoElement for ContextMenu {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
-        self
     }
 }
 

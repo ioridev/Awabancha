@@ -704,6 +704,7 @@ impl Element for TextInputElement {
 }
 
 // Keep the old TextInput for backward compatibility (display-only)
+#[derive(IntoElement)]
 pub struct TextInput {
     value: String,
     placeholder: Option<SharedString>,
@@ -733,14 +734,6 @@ impl TextInput {
 
     pub fn multiline(mut self, multiline: bool) -> Self {
         self.multiline = multiline;
-        self
-    }
-}
-
-impl IntoElement for TextInput {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
         self
     }
 }

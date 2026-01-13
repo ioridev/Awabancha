@@ -234,6 +234,7 @@ impl FileList {
 }
 
 // Keep FileListItem for backward compatibility if needed elsewhere
+#[derive(IntoElement)]
 pub struct FileListItem {
     file: FileStatus,
     is_staged: bool,
@@ -242,14 +243,6 @@ pub struct FileListItem {
 impl FileListItem {
     pub fn new(file: FileStatus, is_staged: bool) -> Self {
         Self { file, is_staged }
-    }
-}
-
-impl IntoElement for FileListItem {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
-        self
     }
 }
 
