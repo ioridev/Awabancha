@@ -428,6 +428,18 @@ impl GitState {
         cx.notify();
     }
 
+    pub fn load_file_diff(&mut self, path: &str, cx: &mut Context<Self>) -> Result<()> {
+        let diff = self.with_repo(|repo| FileDiff::get_file_diff(repo, path))?;
+        self.current_diff = Some(diff);
+        cx.notify();
+        Ok(())
+    }
+
+    pub fn clear_diff(&mut self, cx: &mut Context<Self>) {
+        self.current_diff = None;
+        cx.notify();
+    }
+
     // Load more commits
     pub fn load_more_commits(&mut self, cx: &mut Context<Self>) -> Result<()> {
         if let Some(path) = &self.path {

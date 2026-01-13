@@ -25,6 +25,10 @@ actions!(
         OpenSettings,
         CloseModal,
         Cancel,
+        ShowDiff,
+        CloseDiff,
+        ShowConflictDialog,
+        CloseConflictDialog,
     ]
 );
 

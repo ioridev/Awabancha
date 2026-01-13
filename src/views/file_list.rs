@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use crate::actions::ShowDiff;
 use crate::git::FileStatus;
 use crate::state::GitState;
 use gpui::prelude::*;
@@ -43,6 +44,15 @@ impl FileList {
             }
         });
     }
+
+    fn show_diff(&mut self, path: String, window: &mut Window, cx: &mut Context<Self>) {
+        self.git_state.update(cx, |state, cx| {
+            if let Err(e) = state.load_file_diff(&path, cx) {
+                log::error!("Failed to load diff: {}", e);
+            }
+        });
+        window.dispatch_action(Box::new(ShowDiff), cx);
+    }
 }
 
 impl Render for FileList {
@@ -82,9 +92,14 @@ impl Render for FileList {
                         )
                         .children(staged_files.into_iter().map(|file| {
                             let path = file.path.clone();
+                            let path_for_double = path.clone();
                             self.render_file_item(file, true, cx)
-                                .on_click(cx.listener(move |this, _event, window, cx| {
-                                    this.unstage_file(path.clone(), window, cx);
+                                .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
+                                    if event.click_count() == 2 {
+                                        this.show_diff(path_for_double.clone(), window, cx);
+                                    } else {
+                                        this.unstage_file(path.clone(), window, cx);
+                                    }
                                 }))
                         })),
                 )
@@ -107,9 +122,14 @@ impl Render for FileList {
                         )
                         .children(unstaged_files.into_iter().map(|file| {
                             let path = file.path.clone();
+                            let path_for_double = path.clone();
                             self.render_file_item(file, false, cx)
-                                .on_click(cx.listener(move |this, _event, window, cx| {
-                                    this.stage_file(path.clone(), window, cx);
+                                .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
+                                    if event.click_count() == 2 {
+                                        this.show_diff(path_for_double.clone(), window, cx);
+                                    } else {
+                                        this.stage_file(path.clone(), window, cx);
+                                    }
                                 }))
                         })),
                 )

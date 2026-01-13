@@ -1,6 +1,6 @@
 use crate::actions::*;
 use crate::state::{GitState, RecentProjects, RepositoryWatcher, SettingsState};
-use crate::views::{MainLayout, SettingsView, WelcomeView};
+use crate::views::{ConflictDialog, DiffViewer, MainLayout, SettingsView, WelcomeView};
 use gpui::prelude::*;
 use gpui::*;
 use std::path::PathBuf;
@@ -29,6 +29,12 @@ pub struct Awabancha {
     pub view_mode: ViewMode,
     /// Show settings modal
     pub show_settings: bool,
+    /// Show diff viewer modal
+    pub show_diff: bool,
+    /// Show conflict dialog modal
+    pub show_conflict_dialog: bool,
+    /// Conflict dialog entity
+    conflict_dialog: Option<Entity<ConflictDialog>>,
     /// Main layout entity (created when repository is opened)
     main_layout: Option<Entity<MainLayout>>,
     /// File system watcher for auto-refresh
@@ -54,6 +60,9 @@ impl Awabancha {
             recent_projects,
             view_mode: ViewMode::Welcome,
             show_settings: false,
+            show_diff: false,
+            show_conflict_dialog: false,
+            conflict_dialog: None,
             main_layout: None,
             watcher: Arc::new(Mutex::new(RepositoryWatcher::new())),
         }
@@ -203,10 +212,57 @@ impl Awabancha {
     }
 
     fn handle_cancel(&mut self, _: &Cancel, _window: &mut Window, cx: &mut Context<Self>) {
-        if self.show_settings {
+        if self.show_conflict_dialog {
+            self.show_conflict_dialog = false;
+            cx.notify();
+        } else if self.show_diff {
+            self.show_diff = false;
+            self.git_state.update(cx, |state, cx| {
+                state.clear_diff(cx);
+            });
+            cx.notify();
+        } else if self.show_settings {
             self.show_settings = false;
             cx.notify();
         }
+    }
+
+    fn handle_show_diff(&mut self, _: &ShowDiff, _window: &mut Window, cx: &mut Context<Self>) {
+        self.show_diff = true;
+        cx.notify();
+    }
+
+    fn handle_close_diff(&mut self, _: &CloseDiff, _window: &mut Window, cx: &mut Context<Self>) {
+        self.show_diff = false;
+        self.git_state.update(cx, |state, cx| {
+            state.clear_diff(cx);
+        });
+        cx.notify();
+    }
+
+    fn handle_show_conflict_dialog(
+        &mut self,
+        _: &ShowConflictDialog,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        // Create conflict dialog entity if needed
+        if self.conflict_dialog.is_none() {
+            let git_state = self.git_state.clone();
+            self.conflict_dialog = Some(cx.new(|cx| ConflictDialog::new(git_state, cx)));
+        }
+        self.show_conflict_dialog = true;
+        cx.notify();
+    }
+
+    fn handle_close_conflict_dialog(
+        &mut self,
+        _: &CloseConflictDialog,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.show_conflict_dialog = false;
+        cx.notify();
     }
 
     fn handle_refresh(&mut self, _: &Refresh, _window: &mut Window, cx: &mut Context<Self>) {
@@ -262,6 +318,11 @@ impl Render for Awabancha {
         let recent_projects = self.recent_projects.clone();
         let settings = self.settings.clone();
         let show_settings = self.show_settings;
+        let show_diff = self.show_diff;
+        let show_conflict_dialog = self.show_conflict_dialog;
+        let conflict_dialog = self.conflict_dialog.clone();
+        let current_diff = self.git_state.read(cx).current_diff.clone();
+        let has_conflicts = self.git_state.read(cx).conflict_info.is_some();
 
         div()
             .id("awabancha-root")
@@ -275,6 +336,10 @@ impl Render for Awabancha {
             .on_action(cx.listener(Self::handle_create_commit))
             .on_action(cx.listener(Self::handle_push))
             .on_action(cx.listener(Self::handle_pull))
+            .on_action(cx.listener(Self::handle_show_diff))
+            .on_action(cx.listener(Self::handle_close_diff))
+            .on_action(cx.listener(Self::handle_show_conflict_dialog))
+            .on_action(cx.listener(Self::handle_close_conflict_dialog))
             .flex()
             .flex_col()
             .size_full()
@@ -292,6 +357,78 @@ impl Render for Awabancha {
             })
             .when_some(self.main_layout.clone(), |this, main_layout| {
                 this.child(main_layout)
+            })
+            // Conflict indicator and button when conflicts exist
+            .when(has_conflicts && !show_conflict_dialog, |this| {
+                this.child(
+                    div()
+                        .absolute()
+                        .bottom_4()
+                        .right_4()
+                        .child(
+                            div()
+                                .id("conflict-indicator")
+                                .px_4()
+                                .py_2()
+                                .rounded_lg()
+                                .bg(rgb(0xf38ba8))
+                                .text_sm()
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .text_color(rgb(0x1e1e2e))
+                                .cursor_pointer()
+                                .hover(|s| s.bg(rgb(0xeba0ac)))
+                                .child("⚠ Merge Conflicts - Click to Resolve")
+                                .on_click(|_event, window, cx| {
+                                    window.dispatch_action(Box::new(ShowConflictDialog), cx);
+                                }),
+                        ),
+                )
+            })
+            // Conflict dialog modal overlay
+            .when(show_conflict_dialog && conflict_dialog.is_some(), |this| {
+                let dialog = conflict_dialog.unwrap();
+                this.child(
+                    div()
+                        .absolute()
+                        .inset_0()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .bg(rgba(0x00000088))
+                        .child(
+                            div()
+                                .w(px(700.0))
+                                .h(px(500.0))
+                                .rounded_lg()
+                                .overflow_hidden()
+                                .border_1()
+                                .border_color(rgb(0x313244))
+                                .child(dialog),
+                        ),
+                )
+            })
+            // Diff viewer modal overlay
+            .when(show_diff && current_diff.is_some(), |this| {
+                let diff = current_diff.unwrap();
+                this.child(
+                    div()
+                        .absolute()
+                        .inset_0()
+                        .child(
+                            div()
+                                .id("diff-backdrop")
+                                .absolute()
+                                .inset_0()
+                                .on_click(cx.listener(|this, _event, _window, cx| {
+                                    this.show_diff = false;
+                                    this.git_state.update(cx, |state, cx| {
+                                        state.clear_diff(cx);
+                                    });
+                                    cx.notify();
+                                })),
+                        )
+                        .child(DiffViewer::new(diff)),
+                )
             })
             // Settings modal overlay
             .when(show_settings, |this| {
