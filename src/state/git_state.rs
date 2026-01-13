@@ -1,6 +1,6 @@
 use crate::git::{
-    BranchInfo, CommitGraphData, CommitInfo, ConflictInfo, FileDiff, FileStatus, RepositoryInfo,
-    StashEntry, TagInfo,
+    BranchInfo, CommitGraphData, CommitInfo, ConflictInfo, ConflictStrategy, FileDiff, FileStatus,
+    RepositoryInfo, StashEntry, TagInfo,
 };
 use anyhow::Result;
 use gpui::*;
@@ -462,5 +462,72 @@ impl GitState {
         self.repository_info
             .as_ref()
             .and_then(|r| r.current_branch.as_deref())
+    }
+
+    // Conflict resolution
+    pub fn resolve_all_conflicts(
+        &mut self,
+        strategy: ConflictStrategy,
+        cx: &mut Context<Self>,
+    ) -> Result<()> {
+        self.with_repo_mut(
+            |repo| {
+                ConflictInfo::resolve_all(repo, strategy)?;
+                Ok(())
+            },
+            cx,
+        )
+    }
+
+    pub fn resolve_conflicts_per_file(
+        &mut self,
+        resolutions: Vec<(String, ConflictStrategy)>,
+        cx: &mut Context<Self>,
+    ) -> Result<()> {
+        self.with_repo_mut(
+            |repo| {
+                let mut index = repo.index()?;
+                let conflicts: Vec<_> = index.conflicts()?.collect::<Result<Vec<_>, _>>()?;
+
+                for (path, strategy) in resolutions {
+                    if let Some(conflict) = conflicts.iter().find(|c| {
+                        c.our
+                            .as_ref()
+                            .or(c.their.as_ref())
+                            .and_then(|e| std::str::from_utf8(&e.path).ok())
+                            == Some(&path)
+                    }) {
+                        ConflictInfo::resolve_file(repo, &mut index, &path, conflict, strategy)?;
+                    }
+                }
+                index.write()?;
+                Ok(())
+            },
+            cx,
+        )
+    }
+
+    pub fn complete_merge(
+        &mut self,
+        message: Option<&str>,
+        cx: &mut Context<Self>,
+    ) -> Result<()> {
+        self.with_repo_mut(
+            |repo| {
+                ConflictInfo::complete_merge(repo, message)?;
+                Ok(())
+            },
+            cx,
+        )
+    }
+
+    pub fn abort_merge(&mut self, cx: &mut Context<Self>) -> Result<()> {
+        self.with_repo_mut(
+            |repo| {
+                ConflictInfo::abort_merge(repo)?;
+                Ok(())
+            },
+            cx,
+        )
     }
 }
