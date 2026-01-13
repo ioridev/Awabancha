@@ -139,9 +139,74 @@ impl RenderOnce for SettingsView {
                                     )
                                     .child(
                                         div()
-                                            .text_sm()
+                                            .flex()
+                                            .flex_col()
+                                            .gap_2()
+                                            .child(
+                                                div()
+                                                    .flex()
+                                                    .items_center()
+                                                    .gap_2()
+                                                    .child(
+                                                        div()
+                                                            .text_lg()
+                                                            .font_weight(FontWeight::BOLD)
+                                                            .text_color(rgb(0xcdd6f4))
+                                                            .child("Awabancha"),
+                                                    )
+                                                    .child(
+                                                        div()
+                                                            .px_2()
+                                                            .py_px()
+                                                            .rounded_sm()
+                                                            .bg(rgb(0x313244))
+                                                            .text_xs()
+                                                            .text_color(rgb(0x9399b2))
+                                                            .child("v0.1.0"),
+                                                    ),
+                                            )
+                                            .child(
+                                                div()
+                                                    .text_sm()
+                                                    .text_color(rgb(0x6c7086))
+                                                    .child("A fast Git GUI client built with gpui"),
+                                            )
+                                            .child(
+                                                div()
+                                                    .text_xs()
+                                                    .text_color(rgb(0x6c7086))
+                                                    .child("Powered by git2-rs and gpui"),
+                                            ),
+                                    ),
+                            )
+                            // Keyboard Shortcuts section
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap_3()
+                                    .child(
+                                        div()
+                                            .text_xs()
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .text_color(rgb(0x89b4fa))
+                                            .child("Keyboard Shortcuts"),
+                                    )
+                                    .child(
+                                        div()
+                                            .flex()
+                                            .flex_col()
+                                            .gap_1()
+                                            .text_xs()
                                             .text_color(rgb(0x9399b2))
-                                            .child("Awabancha v0.1.0"),
+                                            .child(KeyboardShortcut::new("Cmd+O", "Open Repository"))
+                                            .child(KeyboardShortcut::new("Cmd+S", "Stage All"))
+                                            .child(KeyboardShortcut::new("Cmd+Enter", "Commit"))
+                                            .child(KeyboardShortcut::new("Cmd+Shift+P", "Push"))
+                                            .child(KeyboardShortcut::new("Cmd+Shift+L", "Pull"))
+                                            .child(KeyboardShortcut::new("Cmd+R", "Refresh"))
+                                            .child(KeyboardShortcut::new("Cmd+,", "Settings"))
+                                            .child(KeyboardShortcut::new("Escape", "Close Modal")),
                                     ),
                             ),
                     ),
@@ -188,5 +253,52 @@ impl RenderOnce for SettingsButton {
             })
             .when(!self.selected, |this| this.hover(|s| s.bg(rgb(0x45475a))))
             .child(self.label)
+    }
+}
+
+struct KeyboardShortcut {
+    shortcut: &'static str,
+    description: &'static str,
+}
+
+impl KeyboardShortcut {
+    fn new(shortcut: &'static str, description: &'static str) -> Self {
+        Self {
+            shortcut,
+            description,
+        }
+    }
+}
+
+impl IntoElement for KeyboardShortcut {
+    type Element = Div;
+
+    fn into_element(self) -> Self::Element {
+        div()
+    }
+}
+
+impl RenderOnce for KeyboardShortcut {
+    fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
+        div()
+            .flex()
+            .items_center()
+            .justify_between()
+            .py_1()
+            .child(
+                div()
+                    .text_color(rgb(0x9399b2))
+                    .child(self.description),
+            )
+            .child(
+                div()
+                    .px_2()
+                    .py_px()
+                    .rounded_sm()
+                    .bg(rgb(0x313244))
+                    .text_color(rgb(0xcdd6f4))
+                    .font_weight(FontWeight::MEDIUM)
+                    .child(self.shortcut),
+            )
     }
 }
