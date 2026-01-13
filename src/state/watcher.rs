@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use std::path::PathBuf;
 use std::sync::{

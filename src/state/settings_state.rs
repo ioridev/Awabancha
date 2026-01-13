@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::state::GitCredentials;
 use gpui::*;
 use serde::{Deserialize, Serialize};

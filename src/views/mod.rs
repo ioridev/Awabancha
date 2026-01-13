@@ -11,11 +11,8 @@ pub mod welcome;
 
 pub use commit_form::*;
 pub use commit_graph::*;
-pub use conflict_dialog::*;
-pub use diff_viewer::*;
 pub use file_list::*;
 pub use left_panel::*;
 pub use main_layout::*;
 pub use right_panel::*;
-pub use settings::*;
 pub use welcome::*;

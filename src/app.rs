@@ -235,7 +235,7 @@ impl Awabancha {
     fn handle_push(&mut self, _: &Push, _window: &mut Window, cx: &mut Context<Self>) {
         let settings = self.settings.read(cx);
         let auth = settings.get_auth_credentials();
-        drop(settings);
+        let _ = settings;
 
         self.git_state.update(cx, |state, cx| {
             if let Err(e) = state.push(auth.as_ref(), cx) {
@@ -247,7 +247,7 @@ impl Awabancha {
     fn handle_pull(&mut self, _: &Pull, _window: &mut Window, cx: &mut Context<Self>) {
         let settings = self.settings.read(cx);
         let auth = settings.get_auth_credentials();
-        drop(settings);
+        let _ = settings;
 
         self.git_state.update(cx, |state, cx| {
             if let Err(e) = state.pull(auth.as_ref(), cx) {

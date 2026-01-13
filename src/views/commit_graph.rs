@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::state::GitState;
 use gpui::prelude::*;
 use gpui::*;

@@ -1,4 +1,6 @@
-use crate::state::{AuthMode, Language, MergeMode, SettingsState, Theme};
+#![allow(dead_code)]
+
+use crate::state::{AuthMode, SettingsState};
 use gpui::prelude::*;
 use gpui::*;
 

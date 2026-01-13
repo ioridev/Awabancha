@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::git::{DiffLineType, FileDiff};
 use gpui::prelude::*;
 use gpui::*;

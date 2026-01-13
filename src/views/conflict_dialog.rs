@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::git::{ConflictInfo, ConflictStrategy, ConflictedFile};
 use crate::state::GitState;
 use gpui::prelude::*;

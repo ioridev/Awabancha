@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::actions::{
     Backspace, Copy, Cut, Delete, End, Enter, Home, Left, Paste, Right, SelectAll, SelectLeft,
     SelectRight, ShowCharacterPalette,

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::git::{
     BranchInfo, CommitGraphData, CommitInfo, ConflictInfo, ConflictStrategy, FileDiff, FileStatus,
     RepositoryInfo, StashEntry, TagInfo,

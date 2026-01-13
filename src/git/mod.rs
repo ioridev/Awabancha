@@ -12,7 +12,6 @@ pub use branch::*;
 pub use commit::*;
 pub use conflict::*;
 pub use diff::*;
-pub use remote::*;
 pub use repository::*;
 pub use stash::*;
 pub use status::*;
