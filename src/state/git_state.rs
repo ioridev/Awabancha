@@ -569,6 +569,17 @@ impl GitState {
             .and_then(|r| r.current_branch.as_deref())
     }
 
+    /// Get the message of the last commit (for amend)
+    pub fn get_last_commit_message(&self) -> Option<String> {
+        self.with_repo(|repo| {
+            let head = repo.head()?;
+            let commit = head.peel_to_commit()?;
+            Ok(commit.message().map(|s| s.to_string()))
+        })
+        .ok()
+        .flatten()
+    }
+
     // Conflict resolution
     pub fn resolve_all_conflicts(
         &mut self,

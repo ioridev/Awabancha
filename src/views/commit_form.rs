@@ -7,6 +7,8 @@ pub struct CommitForm {
     git_state: Entity<GitState>,
     commit_message: Entity<TextInputView>,
     amend: bool,
+    /// Saved message when switching between amend/non-amend modes
+    saved_message: String,
 }
 
 impl CommitForm {
@@ -27,10 +29,32 @@ impl CommitForm {
             git_state,
             commit_message,
             amend: false,
+            saved_message: String::new(),
         }
     }
 
     fn toggle_amend(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+        let current_message = self.commit_message.read(cx).content().to_string();
+
+        if !self.amend {
+            // Switching to amend mode
+            // Save current message and load previous commit message
+            self.saved_message = current_message;
+            if let Some(last_message) = self.git_state.read(cx).get_last_commit_message() {
+                let trimmed = last_message.trim().to_string();
+                self.commit_message.update(cx, |input, cx| {
+                    input.set_content(trimmed, cx);
+                });
+            }
+        } else {
+            // Switching back to normal mode
+            // Restore saved message
+            let saved = self.saved_message.clone();
+            self.commit_message.update(cx, |input, cx| {
+                input.set_content(saved, cx);
+            });
+        }
+
         self.amend = !self.amend;
         cx.notify();
     }
