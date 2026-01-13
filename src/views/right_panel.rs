@@ -5,24 +5,23 @@ use gpui::*;
 
 pub struct RightPanel {
     git_state: Entity<GitState>,
+    commit_graph: Entity<CommitGraph>,
 }
 
 impl RightPanel {
-    pub fn new(git_state: Entity<GitState>) -> Self {
-        Self { git_state }
+    pub fn new(git_state: Entity<GitState>, cx: &mut Context<Self>) -> Self {
+        let git_state_clone = git_state.clone();
+        let commit_graph = cx.new(|cx| CommitGraph::new(git_state_clone, cx));
+
+        Self {
+            git_state,
+            commit_graph,
+        }
     }
 }
 
-impl IntoElement for RightPanel {
-    type Element = Div;
-
-    fn into_element(self) -> Self::Element {
-        div()
-    }
-}
-
-impl RenderOnce for RightPanel {
-    fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
+impl Render for RightPanel {
+    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
         div()
             .flex()
             .flex_col()
@@ -56,7 +55,7 @@ impl RenderOnce for RightPanel {
                     .id("commit-graph-scroll")
                     .flex_1()
                     .overflow_y_scroll()
-                    .child(CommitGraph::new(self.git_state.clone())),
+                    .child(self.commit_graph.clone()),
             )
     }
 }

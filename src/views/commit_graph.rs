@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use crate::git::ResetMode;
 use crate::state::GitState;
 use gpui::prelude::*;
 use gpui::*;
@@ -11,37 +12,154 @@ const GRAPH_PADDING: f32 = 8.0;
 
 pub struct CommitGraph {
     git_state: Entity<GitState>,
+    /// Context menu state
+    context_menu: Option<ContextMenuState>,
+}
+
+#[derive(Clone)]
+struct ContextMenuState {
+    sha: String,
+    position: Point<Pixels>,
+    is_merge_commit: bool,
 }
 
 impl CommitGraph {
-    pub fn new(git_state: Entity<GitState>) -> Self {
-        Self { git_state }
+    pub fn new(git_state: Entity<GitState>, cx: &mut Context<Self>) -> Self {
+        // Observe git state changes
+        cx.observe(&git_state, |_this, _git_state, cx| {
+            cx.notify();
+        })
+        .detach();
+
+        Self {
+            git_state,
+            context_menu: None,
+        }
+    }
+
+    fn show_context_menu(
+        &mut self,
+        sha: String,
+        position: Point<Pixels>,
+        is_merge_commit: bool,
+        cx: &mut Context<Self>,
+    ) {
+        self.context_menu = Some(ContextMenuState {
+            sha,
+            position,
+            is_merge_commit,
+        });
+        cx.notify();
+    }
+
+    fn hide_context_menu(&mut self, cx: &mut Context<Self>) {
+        self.context_menu = None;
+        cx.notify();
+    }
+
+    fn checkout_commit(&mut self, sha: &str, _window: &mut Window, cx: &mut Context<Self>) {
+        self.git_state.update(cx, |state, cx| {
+            if let Err(e) = state.checkout_commit(sha, cx) {
+                log::error!("Failed to checkout commit: {}", e);
+            }
+        });
+        self.hide_context_menu(cx);
+    }
+
+    fn create_branch_from(&mut self, sha: &str, _window: &mut Window, cx: &mut Context<Self>) {
+        // For now, create a branch with a default name
+        // TODO: Show dialog to input branch name
+        let branch_name = format!("branch-{}", &sha[..7]);
+        self.git_state.update(cx, |state, cx| {
+            if let Err(e) = state.checkout_commit(sha, cx) {
+                log::error!("Failed to checkout: {}", e);
+                return;
+            }
+            if let Err(e) = state.create_branch(&branch_name, cx) {
+                log::error!("Failed to create branch: {}", e);
+            }
+        });
+        self.hide_context_menu(cx);
+    }
+
+    fn cherry_pick(&mut self, sha: &str, _window: &mut Window, cx: &mut Context<Self>) {
+        self.git_state.update(cx, |state, cx| {
+            if let Err(e) = state.cherry_pick(sha, cx) {
+                log::error!("Failed to cherry-pick: {}", e);
+            }
+        });
+        self.hide_context_menu(cx);
+    }
+
+    fn revert_commit(
+        &mut self,
+        sha: &str,
+        mainline: Option<u32>,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.git_state.update(cx, |state, cx| {
+            if let Err(e) = state.revert_commit(sha, mainline, cx) {
+                log::error!("Failed to revert: {}", e);
+            }
+        });
+        self.hide_context_menu(cx);
+    }
+
+    fn reset_to_commit(
+        &mut self,
+        sha: &str,
+        mode: ResetMode,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.git_state.update(cx, |state, cx| {
+            if let Err(e) = state.reset_to_commit(sha, mode, cx) {
+                log::error!("Failed to reset: {}", e);
+            }
+        });
+        self.hide_context_menu(cx);
     }
 }
 
-impl IntoElement for CommitGraph {
-    type Element = Div;
-
-    fn into_element(self) -> Self::Element {
-        div()
-    }
-}
-
-impl RenderOnce for CommitGraph {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let git_state = self.git_state.clone();
-        let git_state_read = git_state.read(cx);
-
+impl Render for CommitGraph {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let git_state_read = self.git_state.read(cx);
         let commits = git_state_read.commits.clone();
+        let context_menu = self.context_menu.clone();
 
         div()
             .flex()
             .flex_col()
             .size_full()
+            .relative()
+            // Click outside to close context menu
+            .when(context_menu.is_some(), |this| {
+                this.on_mouse_down(
+                    MouseButton::Left,
+                    cx.listener(|this, _event: &MouseDownEvent, _window, cx| {
+                        this.hide_context_menu(cx);
+                    }),
+                )
+            })
             .when(commits.is_some(), |this| {
                 let commits = commits.unwrap();
                 this.children(commits.nodes.iter().enumerate().map(|(idx, node)| {
-                    CommitRow::new(node.clone(), idx, commits.max_column)
+                    let sha = node.commit.sha.clone();
+                    let is_merge = node.commit.parents.len() > 1;
+                    div()
+                        .child(CommitRow::new(node.clone(), idx, commits.max_column))
+                        .on_mouse_down(
+                            MouseButton::Right,
+                            cx.listener(move |this, event: &MouseDownEvent, _window, cx| {
+                                this.show_context_menu(
+                                    sha.clone(),
+                                    event.position,
+                                    is_merge,
+                                    cx,
+                                );
+                            }),
+                        )
                 }))
             })
             .when(git_state_read.commits.is_none(), |this| {
@@ -56,6 +174,162 @@ impl RenderOnce for CommitGraph {
                         .child("No commits"),
                 )
             })
+            // Context menu
+            .when_some(context_menu.clone(), |this, menu| {
+                this.child(self.render_context_menu(menu, cx))
+            })
+    }
+}
+
+impl CommitGraph {
+    fn render_context_menu(
+        &self,
+        menu: ContextMenuState,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        let sha = menu.sha.clone();
+        let sha_checkout = sha.clone();
+        let sha_branch = sha.clone();
+        let sha_cherry = sha.clone();
+        let sha_revert = sha.clone();
+        let sha_reset_soft = sha.clone();
+        let sha_reset_mixed = sha.clone();
+        let sha_reset_hard = sha.clone();
+        let is_merge = menu.is_merge_commit;
+
+        div()
+            .absolute()
+            .left(menu.position.x)
+            .top(menu.position.y)
+            .w(px(200.0))
+            .rounded_lg()
+            .bg(rgb(0x181825))
+            .border_1()
+            .border_color(rgb(0x313244))
+            .shadow_lg()
+            .py_1()
+            .flex()
+            .flex_col()
+            // Checkout
+            .child(
+                div()
+                    .id("ctx-checkout")
+                    .px_3()
+                    .py_2()
+                    .text_sm()
+                    .text_color(rgb(0xcdd6f4))
+                    .cursor_pointer()
+                    .hover(|s| s.bg(rgb(0x313244)))
+                    .child("Checkout")
+                    .on_click(cx.listener(move |this, _event, window, cx| {
+                        this.checkout_commit(&sha_checkout, window, cx);
+                    })),
+            )
+            // Create branch
+            .child(
+                div()
+                    .id("ctx-branch")
+                    .px_3()
+                    .py_2()
+                    .text_sm()
+                    .text_color(rgb(0xcdd6f4))
+                    .cursor_pointer()
+                    .hover(|s| s.bg(rgb(0x313244)))
+                    .child("Create Branch")
+                    .on_click(cx.listener(move |this, _event, window, cx| {
+                        this.create_branch_from(&sha_branch, window, cx);
+                    })),
+            )
+            // Separator
+            .child(div().h_px().bg(rgb(0x313244)).my_1())
+            // Cherry-pick
+            .child(
+                div()
+                    .id("ctx-cherry-pick")
+                    .px_3()
+                    .py_2()
+                    .text_sm()
+                    .text_color(rgb(0xcdd6f4))
+                    .cursor_pointer()
+                    .hover(|s| s.bg(rgb(0x313244)))
+                    .child("Cherry-pick")
+                    .on_click(cx.listener(move |this, _event, window, cx| {
+                        this.cherry_pick(&sha_cherry, window, cx);
+                    })),
+            )
+            // Revert
+            .child(
+                div()
+                    .id("ctx-revert")
+                    .px_3()
+                    .py_2()
+                    .text_sm()
+                    .text_color(rgb(0xcdd6f4))
+                    .cursor_pointer()
+                    .hover(|s| s.bg(rgb(0x313244)))
+                    .child(if is_merge {
+                        "Revert (mainline 1)"
+                    } else {
+                        "Revert"
+                    })
+                    .on_click(cx.listener(move |this, _event, window, cx| {
+                        let mainline = if is_merge { Some(1) } else { None };
+                        this.revert_commit(&sha_revert, mainline, window, cx);
+                    })),
+            )
+            // Separator
+            .child(div().h_px().bg(rgb(0x313244)).my_1())
+            // Reset submenu
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(rgb(0x6c7086))
+                    .px_3()
+                    .py_1()
+                    .child("Reset to this commit:"),
+            )
+            .child(
+                div()
+                    .id("ctx-reset-soft")
+                    .px_3()
+                    .py_2()
+                    .text_sm()
+                    .text_color(rgb(0xa6e3a1))
+                    .cursor_pointer()
+                    .hover(|s| s.bg(rgb(0x313244)))
+                    .child("Soft (keep changes staged)")
+                    .on_click(cx.listener(move |this, _event, window, cx| {
+                        this.reset_to_commit(&sha_reset_soft, ResetMode::Soft, window, cx);
+                    })),
+            )
+            .child(
+                div()
+                    .id("ctx-reset-mixed")
+                    .px_3()
+                    .py_2()
+                    .text_sm()
+                    .text_color(rgb(0xf9e2af))
+                    .cursor_pointer()
+                    .hover(|s| s.bg(rgb(0x313244)))
+                    .child("Mixed (keep changes unstaged)")
+                    .on_click(cx.listener(move |this, _event, window, cx| {
+                        this.reset_to_commit(&sha_reset_mixed, ResetMode::Mixed, window, cx);
+                    })),
+            )
+            .child(
+                div()
+                    .id("ctx-reset-hard")
+                    .px_3()
+                    .py_2()
+                    .text_sm()
+                    .text_color(rgb(0xf38ba8))
+                    .cursor_pointer()
+                    .hover(|s| s.bg(rgb(0x313244)))
+                    .child("Hard (discard all changes)")
+                    .on_click(cx.listener(move |this, _event, window, cx| {
+                        this.reset_to_commit(&sha_reset_hard, ResetMode::Hard, window, cx);
+                    })),
+            )
     }
 }
 

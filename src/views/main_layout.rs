@@ -9,6 +9,7 @@ pub struct MainLayout {
     #[allow(dead_code)]
     settings: Entity<SettingsState>,
     left_panel: Entity<LeftPanel>,
+    right_panel: Entity<RightPanel>,
 }
 
 impl MainLayout {
@@ -21,6 +22,7 @@ impl MainLayout {
         let left_panel = cx.new(|cx| {
             LeftPanel::new(git_state.clone(), cx).with_settings(settings_clone)
         });
+        let right_panel = cx.new(|cx| RightPanel::new(git_state.clone(), cx));
 
         // Observe git state changes
         cx.observe(&git_state, |_this, _git_state, cx| {
@@ -32,6 +34,7 @@ impl MainLayout {
             git_state,
             settings,
             left_panel,
+            right_panel,
         }
     }
 }
@@ -140,7 +143,7 @@ impl Render for MainLayout {
                             .flex_col()
                             .flex_1()
                             .bg(rgb(0x1e1e2e))
-                            .child(RightPanel::new(self.git_state.clone())),
+                            .child(self.right_panel.clone()),
                     ),
             )
     }
