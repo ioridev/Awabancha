@@ -398,6 +398,52 @@ impl GitState {
         )
     }
 
+    // Stash operations
+    pub fn stash_save(&mut self, message: Option<&str>, cx: &mut Context<Self>) -> Result<()> {
+        if let Some(path) = &self.path {
+            let mut repo = git2::Repository::open(path)?;
+            StashEntry::save(&mut repo, message)?;
+            // Refresh stash list
+            self.stashes = StashEntry::get_all(&mut repo)?;
+            cx.notify();
+        }
+        Ok(())
+    }
+
+    pub fn stash_pop(&mut self, index: usize, cx: &mut Context<Self>) -> Result<()> {
+        if let Some(path) = &self.path {
+            let mut repo = git2::Repository::open(path)?;
+            StashEntry::pop(&mut repo, index)?;
+            // Refresh stash list and files
+            self.stashes = StashEntry::get_all(&mut repo)?;
+            self.files = FileStatus::get_all(&repo)?;
+            cx.notify();
+        }
+        Ok(())
+    }
+
+    pub fn stash_apply(&mut self, index: usize, cx: &mut Context<Self>) -> Result<()> {
+        if let Some(path) = &self.path {
+            let mut repo = git2::Repository::open(path)?;
+            StashEntry::apply(&mut repo, index)?;
+            // Refresh files (stash list stays the same)
+            self.files = FileStatus::get_all(&repo)?;
+            cx.notify();
+        }
+        Ok(())
+    }
+
+    pub fn stash_drop(&mut self, index: usize, cx: &mut Context<Self>) -> Result<()> {
+        if let Some(path) = &self.path {
+            let mut repo = git2::Repository::open(path)?;
+            StashEntry::drop(&mut repo, index)?;
+            // Refresh stash list
+            self.stashes = StashEntry::get_all(&mut repo)?;
+            cx.notify();
+        }
+        Ok(())
+    }
+
     // Selection
     pub fn toggle_file_selection(&mut self, path: &str, cx: &mut Context<Self>) {
         if let Some(pos) = self.selected_files.iter().position(|p| p == path) {

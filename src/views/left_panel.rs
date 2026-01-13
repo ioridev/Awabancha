@@ -8,6 +8,8 @@ pub struct LeftPanel {
     settings: Option<Entity<SettingsState>>,
     commit_form: Entity<CommitForm>,
     file_list: Entity<FileList>,
+    /// Whether stash section is expanded
+    stash_expanded: bool,
 }
 
 impl LeftPanel {
@@ -26,12 +28,18 @@ impl LeftPanel {
             settings: None,
             commit_form,
             file_list,
+            stash_expanded: false,
         }
     }
 
     pub fn with_settings(mut self, settings: Entity<SettingsState>) -> Self {
         self.settings = Some(settings);
         self
+    }
+
+    fn toggle_stash_expanded(&mut self, cx: &mut Context<Self>) {
+        self.stash_expanded = !self.stash_expanded;
+        cx.notify();
     }
 
     fn handle_push(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
@@ -88,6 +96,38 @@ impl LeftPanel {
             }
         });
     }
+
+    fn handle_stash_save(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+        self.git_state.update(cx, |state, cx| {
+            if let Err(e) = state.stash_save(None, cx) {
+                log::error!("Failed to save stash: {}", e);
+            }
+        });
+    }
+
+    fn handle_stash_pop(&mut self, index: usize, _window: &mut Window, cx: &mut Context<Self>) {
+        self.git_state.update(cx, |state, cx| {
+            if let Err(e) = state.stash_pop(index, cx) {
+                log::error!("Failed to pop stash: {}", e);
+            }
+        });
+    }
+
+    fn handle_stash_apply(&mut self, index: usize, _window: &mut Window, cx: &mut Context<Self>) {
+        self.git_state.update(cx, |state, cx| {
+            if let Err(e) = state.stash_apply(index, cx) {
+                log::error!("Failed to apply stash: {}", e);
+            }
+        });
+    }
+
+    fn handle_stash_drop(&mut self, index: usize, _window: &mut Window, cx: &mut Context<Self>) {
+        self.git_state.update(cx, |state, cx| {
+            if let Err(e) = state.stash_drop(index, cx) {
+                log::error!("Failed to drop stash: {}", e);
+            }
+        });
+    }
 }
 
 impl Render for LeftPanel {
@@ -95,6 +135,8 @@ impl Render for LeftPanel {
         let git_state_read = self.git_state.read(cx);
         let staged_count = git_state_read.staged_files().len();
         let unstaged_count = git_state_read.unstaged_files().len();
+        let stashes = git_state_read.stashes.clone();
+        let stash_expanded = self.stash_expanded;
 
         div()
             .flex()
@@ -201,6 +243,180 @@ impl Render for LeftPanel {
                     .flex_1()
                     .overflow_y_scroll()
                     .child(self.file_list.clone()),
+            )
+            // Stash Section
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .border_t_1()
+                    .border_color(rgb(0x313244))
+                    // Stash Header
+                    .child(
+                        div()
+                            .id("stash-header")
+                            .flex()
+                            .items_center()
+                            .justify_between()
+                            .px_4()
+                            .py_2()
+                            .bg(rgb(0x181825))
+                            .cursor_pointer()
+                            .hover(|s| s.bg(rgb(0x1e1e2e)))
+                            .on_click(cx.listener(|this, _event, _window, cx| {
+                                this.toggle_stash_expanded(cx);
+                            }))
+                            .child(
+                                div()
+                                    .flex()
+                                    .items_center()
+                                    .gap_2()
+                                    .child(
+                                        div()
+                                            .text_xs()
+                                            .text_color(rgb(0x9399b2))
+                                            .child(if stash_expanded { "▼" } else { "▶" }),
+                                    )
+                                    .child(
+                                        div()
+                                            .text_sm()
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .text_color(rgb(0xcdd6f4))
+                                            .child("Stashes"),
+                                    )
+                                    .when(!stashes.is_empty(), |this| {
+                                        this.child(
+                                            div()
+                                                .px_2()
+                                                .py_px()
+                                                .rounded_sm()
+                                                .bg(rgb(0xcba6f7))
+                                                .text_xs()
+                                                .text_color(rgb(0x1e1e2e))
+                                                .child(format!("{}", stashes.len())),
+                                        )
+                                    }),
+                            )
+                            // Stash Save button
+                            .child(
+                                div()
+                                    .id("stash-save-btn")
+                                    .px_2()
+                                    .py_1()
+                                    .rounded_sm()
+                                    .text_xs()
+                                    .text_color(rgb(0xcba6f7))
+                                    .cursor_pointer()
+                                    .hover(|s| s.bg(rgb(0x313244)))
+                                    .child("+ Stash")
+                                    .on_click(cx.listener(|this, _event, window, cx| {
+                                        this.handle_stash_save(window, cx);
+                                    })),
+                            ),
+                    )
+                    // Stash List (when expanded)
+                    .when(stash_expanded && !stashes.is_empty(), |this| {
+                        this.child(
+                            div()
+                                .id("stash-list-scroll")
+                                .flex()
+                                .flex_col()
+                                .max_h(px(150.0))
+                                .overflow_scroll()
+                                .children(stashes.iter().enumerate().map(|(idx, stash)| {
+                                    let stash_idx = stash.index;
+                                    let stash_idx_pop = stash_idx;
+                                    let stash_idx_apply = stash_idx;
+                                    let stash_idx_drop = stash_idx;
+                                    div()
+                                        .id(ElementId::Name(format!("stash-{}", idx).into()))
+                                        .flex()
+                                        .items_center()
+                                        .justify_between()
+                                        .px_4()
+                                        .py_2()
+                                        .border_t_1()
+                                        .border_color(rgb(0x313244))
+                                        .hover(|s| s.bg(rgb(0x313244)))
+                                        // Stash info
+                                        .child(
+                                            div()
+                                                .flex()
+                                                .flex_col()
+                                                .flex_1()
+                                                .overflow_hidden()
+                                                .child(
+                                                    div()
+                                                        .text_xs()
+                                                        .text_color(rgb(0x9399b2))
+                                                        .child(format!("stash@{{{}}}", stash.index)),
+                                                )
+                                                .child(
+                                                    div()
+                                                        .text_sm()
+                                                        .text_color(rgb(0xcdd6f4))
+                                                        .text_ellipsis()
+                                                        .child(stash.message.clone()),
+                                                ),
+                                        )
+                                        // Action buttons
+                                        .child(
+                                            div()
+                                                .flex()
+                                                .items_center()
+                                                .gap_1()
+                                                // Pop
+                                                .child(
+                                                    div()
+                                                        .id(ElementId::Name(format!("stash-pop-{}", idx).into()))
+                                                        .px_2()
+                                                        .py_1()
+                                                        .rounded_sm()
+                                                        .text_xs()
+                                                        .text_color(rgb(0xa6e3a1))
+                                                        .cursor_pointer()
+                                                        .hover(|s| s.bg(rgb(0x45475a)))
+                                                        .child("Pop")
+                                                        .on_click(cx.listener(move |this, _event, window, cx| {
+                                                            this.handle_stash_pop(stash_idx_pop, window, cx);
+                                                        })),
+                                                )
+                                                // Apply
+                                                .child(
+                                                    div()
+                                                        .id(ElementId::Name(format!("stash-apply-{}", idx).into()))
+                                                        .px_2()
+                                                        .py_1()
+                                                        .rounded_sm()
+                                                        .text_xs()
+                                                        .text_color(rgb(0x89b4fa))
+                                                        .cursor_pointer()
+                                                        .hover(|s| s.bg(rgb(0x45475a)))
+                                                        .child("Apply")
+                                                        .on_click(cx.listener(move |this, _event, window, cx| {
+                                                            this.handle_stash_apply(stash_idx_apply, window, cx);
+                                                        })),
+                                                )
+                                                // Drop
+                                                .child(
+                                                    div()
+                                                        .id(ElementId::Name(format!("stash-drop-{}", idx).into()))
+                                                        .px_2()
+                                                        .py_1()
+                                                        .rounded_sm()
+                                                        .text_xs()
+                                                        .text_color(rgb(0xf38ba8))
+                                                        .cursor_pointer()
+                                                        .hover(|s| s.bg(rgb(0x45475a)))
+                                                        .child("Drop")
+                                                        .on_click(cx.listener(move |this, _event, window, cx| {
+                                                            this.handle_stash_drop(stash_idx_drop, window, cx);
+                                                        })),
+                                                ),
+                                        )
+                                })),
+                        )
+                    }),
             )
             // Remote Operations
             .child(
