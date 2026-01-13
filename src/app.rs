@@ -28,6 +28,8 @@ pub struct Awabancha {
     pub view_mode: ViewMode,
     /// Show settings modal
     pub show_settings: bool,
+    /// Main layout entity (created when repository is opened)
+    main_layout: Option<Entity<MainLayout>>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -49,6 +51,7 @@ impl Awabancha {
             recent_projects,
             view_mode: ViewMode::Welcome,
             show_settings: false,
+            main_layout: None,
         }
     }
 
@@ -73,6 +76,11 @@ impl Awabancha {
             }
         });
 
+        // Create main layout
+        let git_state = self.git_state.clone();
+        let settings = self.settings.clone();
+        self.main_layout = Some(cx.new(|cx| MainLayout::new(git_state, settings, cx)));
+
         self.repository_path = Some(path);
         self.view_mode = ViewMode::Repository;
         cx.notify();
@@ -84,6 +92,7 @@ impl Awabancha {
         });
         self.repository_path = None;
         self.view_mode = ViewMode::Welcome;
+        self.main_layout = None;
         cx.notify();
     }
 
@@ -106,7 +115,8 @@ impl Awabancha {
                 if let Some(path) = paths.into_iter().next() {
                     this.update(cx, |app, cx| {
                         app.open_repository(path, cx);
-                    }).ok();
+                    })
+                    .ok();
                 }
             }
         })
@@ -189,8 +199,6 @@ impl Awabancha {
 
 impl Render for Awabancha {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let git_state = self.git_state.clone();
-        let settings = self.settings.clone();
         let recent_projects = self.recent_projects.clone();
 
         div()
@@ -219,8 +227,8 @@ impl Render for Awabancha {
                     ),
                 )
             })
-            .when(self.view_mode == ViewMode::Repository, |this| {
-                this.child(MainLayout::new(git_state.clone(), settings.clone()))
+            .when_some(self.main_layout.clone(), |this, main_layout| {
+                this.child(main_layout)
             })
     }
 }

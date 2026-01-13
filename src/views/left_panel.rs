@@ -5,27 +5,29 @@ use gpui::*;
 
 pub struct LeftPanel {
     git_state: Entity<GitState>,
+    commit_form: Entity<CommitForm>,
 }
 
 impl LeftPanel {
-    pub fn new(git_state: Entity<GitState>) -> Self {
-        Self { git_state }
+    pub fn new(git_state: Entity<GitState>, cx: &mut Context<Self>) -> Self {
+        let commit_form = cx.new(|cx| CommitForm::new(git_state.clone(), cx));
+
+        // Observe git state changes
+        cx.observe(&git_state, |_this, _git_state, cx| {
+            cx.notify();
+        })
+        .detach();
+
+        Self {
+            git_state,
+            commit_form,
+        }
     }
 }
 
-impl IntoElement for LeftPanel {
-    type Element = Div;
-
-    fn into_element(self) -> Self::Element {
-        div()
-    }
-}
-
-impl RenderOnce for LeftPanel {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let git_state = self.git_state.clone();
-        let git_state_read = git_state.read(cx);
-
+impl Render for LeftPanel {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let git_state_read = self.git_state.read(cx);
         let staged_count = git_state_read.staged_files().len();
         let unstaged_count = git_state_read.unstaged_files().len();
 
@@ -42,7 +44,7 @@ impl RenderOnce for LeftPanel {
                     .p_4()
                     .border_b_1()
                     .border_color(rgb(0x313244))
-                    .child(CommitForm::new(self.git_state.clone())),
+                    .child(self.commit_form.clone()),
             )
             // File List Header
             .child(

@@ -5,27 +5,36 @@ use gpui::*;
 
 pub struct MainLayout {
     git_state: Entity<GitState>,
+    #[allow(dead_code)]
     settings: Entity<SettingsState>,
+    left_panel: Entity<LeftPanel>,
 }
 
 impl MainLayout {
-    pub fn new(git_state: Entity<GitState>, settings: Entity<SettingsState>) -> Self {
-        Self { git_state, settings }
+    pub fn new(
+        git_state: Entity<GitState>,
+        settings: Entity<SettingsState>,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        let left_panel = cx.new(|cx| LeftPanel::new(git_state.clone(), cx));
+
+        // Observe git state changes
+        cx.observe(&git_state, |_this, _git_state, cx| {
+            cx.notify();
+        })
+        .detach();
+
+        Self {
+            git_state,
+            settings,
+            left_panel,
+        }
     }
 }
 
-impl IntoElement for MainLayout {
-    type Element = Div;
-
-    fn into_element(self) -> Self::Element {
-        div()
-    }
-}
-
-impl RenderOnce for MainLayout {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let git_state = self.git_state.clone();
-        let git_state_read = git_state.read(cx);
+impl Render for MainLayout {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let git_state_read = self.git_state.read(cx);
 
         let current_branch = git_state_read.current_branch().map(|s| s.to_string());
         let is_detached = git_state_read.is_detached();
@@ -115,7 +124,7 @@ impl RenderOnce for MainLayout {
                             .bg(rgb(0x1e1e2e))
                             .border_r_1()
                             .border_color(rgb(0x313244))
-                            .child(LeftPanel::new(self.git_state.clone())),
+                            .child(self.left_panel.clone()),
                     )
                     // Right panel (commit graph)
                     .child(

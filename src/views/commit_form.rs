@@ -1,38 +1,84 @@
+use crate::components::TextInputView;
 use crate::state::GitState;
 use gpui::prelude::*;
 use gpui::*;
 
 pub struct CommitForm {
     git_state: Entity<GitState>,
+    commit_message: Entity<TextInputView>,
+    amend: bool,
 }
 
 impl CommitForm {
-    pub fn new(git_state: Entity<GitState>) -> Self {
-        Self { git_state }
+    pub fn new(git_state: Entity<GitState>, cx: &mut Context<Self>) -> Self {
+        let commit_message = cx.new(|cx| {
+            TextInputView::new(cx)
+                .with_placeholder("Enter commit message...")
+                .multiline(true)
+        });
+
+        // Observe git state changes
+        cx.observe(&git_state, |_this, _git_state, cx| {
+            cx.notify();
+        })
+        .detach();
+
+        Self {
+            git_state,
+            commit_message,
+            amend: false,
+        }
+    }
+
+    fn toggle_amend(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+        self.amend = !self.amend;
+        cx.notify();
+    }
+
+    fn do_commit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let message = self.commit_message.read(cx).content().to_string();
+        if message.trim().is_empty() {
+            return;
+        }
+
+        let amend = self.amend;
+        self.git_state.update(cx, |state, cx| {
+            let result = if amend {
+                state.amend_commit(&message, cx)
+            } else {
+                state.create_commit(&message, cx)
+            };
+
+            if let Err(e) = result {
+                log::error!("Failed to commit: {}", e);
+            }
+        });
+
+        // Clear the commit message after successful commit
+        self.commit_message.update(cx, |input, cx| {
+            input.set_content("", cx);
+        });
+        self.amend = false;
+        cx.notify();
+
+        // Focus back to the input
+        let focus_handle = self.commit_message.read(cx).focus_handle(cx);
+        window.focus(&focus_handle, cx);
     }
 }
 
-impl IntoElement for CommitForm {
-    type Element = Div;
-
-    fn into_element(self) -> Self::Element {
-        div()
-    }
-}
-
-impl RenderOnce for CommitForm {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let git_state = self.git_state.clone();
-        let git_state_read = git_state.read(cx);
-
-        let staged_count = git_state_read.staged_files().len();
+impl Render for CommitForm {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let git_state = self.git_state.read(cx);
+        let staged_count = git_state.staged_files().len();
         let can_commit = staged_count > 0;
+        let amend = self.amend;
 
         div()
             .flex()
             .flex_col()
             .gap_3()
-            // Commit message textarea
+            // Commit message section
             .child(
                 div()
                     .flex()
@@ -44,20 +90,7 @@ impl RenderOnce for CommitForm {
                             .text_color(rgb(0x9399b2))
                             .child("Commit message"),
                     )
-                    .child(
-                        div()
-                            .w_full()
-                            .h_20()
-                            .px_3()
-                            .py_2()
-                            .rounded_md()
-                            .bg(rgb(0x313244))
-                            .text_sm()
-                            .text_color(rgb(0xcdd6f4))
-                            .border_1()
-                            .border_color(rgb(0x45475a))
-                            .child("Type your commit message here..."),
-                    ),
+                    .child(self.commit_message.clone()),
             )
             // Options row
             .child(
@@ -72,12 +105,35 @@ impl RenderOnce for CommitForm {
                             .items_center()
                             .gap_1()
                             .cursor_pointer()
+                            .on_click(cx.listener(|this, _event, window, cx| {
+                                this.toggle_amend(window, cx);
+                            }))
                             .child(
                                 div()
                                     .size_4()
                                     .rounded_sm()
                                     .border_1()
-                                    .border_color(rgb(0x6c7086)),
+                                    .border_color(if amend {
+                                        rgb(0x89b4fa)
+                                    } else {
+                                        rgb(0x6c7086)
+                                    })
+                                    .bg(if amend {
+                                        rgb(0x89b4fa)
+                                    } else {
+                                        rgb(0x313244)
+                                    })
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .when(amend, |this| {
+                                        this.child(
+                                            div()
+                                                .text_xs()
+                                                .text_color(rgb(0x1e1e2e))
+                                                .child("✓"),
+                                        )
+                                    }),
                             )
                             .child(
                                 div()
@@ -113,6 +169,9 @@ impl RenderOnce for CommitForm {
                         this.cursor_pointer()
                             .hover(|s| s.bg(rgb(0x94e2d5)))
                             .active(|s| s.bg(rgb(0x89b4fa)))
+                            .on_click(cx.listener(|this, _event, window, cx| {
+                                this.do_commit(window, cx);
+                            }))
                     })
                     .child(format!(
                         "Commit ({} file{})",
