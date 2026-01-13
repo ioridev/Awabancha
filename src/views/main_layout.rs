@@ -1,3 +1,4 @@
+use crate::actions::OpenSettings;
 use crate::state::{GitState, SettingsState};
 use crate::views::{LeftPanel, RightPanel};
 use gpui::prelude::*;
@@ -107,7 +108,10 @@ impl Render for MainLayout {
                             .text_color(rgb(0x9399b2))
                             .cursor_pointer()
                             .hover(|s| s.bg(rgb(0x313244)).text_color(rgb(0xcdd6f4)))
-                            .child("Settings"),
+                            .child("Settings")
+                            .on_click(|_event, window, cx| {
+                                window.dispatch_action(Box::new(OpenSettings), cx);
+                            }),
                     ),
             )
             // Main content area (left + right panels)

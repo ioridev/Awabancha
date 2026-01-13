@@ -1,6 +1,6 @@
 use crate::actions::*;
 use crate::state::{GitState, RecentProjects, RepositoryWatcher, SettingsState};
-use crate::views::{MainLayout, WelcomeView};
+use crate::views::{MainLayout, SettingsView, WelcomeView};
 use gpui::prelude::*;
 use gpui::*;
 use std::path::PathBuf;
@@ -260,6 +260,8 @@ impl Awabancha {
 impl Render for Awabancha {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let recent_projects = self.recent_projects.clone();
+        let settings = self.settings.clone();
+        let show_settings = self.show_settings;
 
         div()
             .id("awabancha-root")
@@ -278,6 +280,7 @@ impl Render for Awabancha {
             .size_full()
             .bg(rgb(0x1e1e2e))
             .text_color(rgb(0xcdd6f4))
+            .relative()
             .when(self.view_mode == ViewMode::Welcome, |this| {
                 this.child(
                     WelcomeView::new(recent_projects.clone()).on_open_repository(
@@ -289,6 +292,25 @@ impl Render for Awabancha {
             })
             .when_some(self.main_layout.clone(), |this, main_layout| {
                 this.child(main_layout)
+            })
+            // Settings modal overlay
+            .when(show_settings, |this| {
+                this.child(
+                    div()
+                        .absolute()
+                        .inset_0()
+                        .child(
+                            div()
+                                .id("settings-backdrop")
+                                .absolute()
+                                .inset_0()
+                                .on_click(cx.listener(|this, _event, _window, cx| {
+                                    this.show_settings = false;
+                                    cx.notify();
+                                })),
+                        )
+                        .child(SettingsView::new(settings)),
+                )
             })
     }
 }
