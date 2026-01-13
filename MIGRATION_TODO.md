@@ -84,9 +84,10 @@ Migration from VibeWithGraph (Tauri + React) to Awabancha (Rust + gpui)
   - Add project on open
   - Remove project via context menu
 
-- [ ] **Drag-and-drop support**
+- [x] **Drag-and-drop support**
   - Accept dropped directories
   - Validate as git repository
+  - Opens repository on valid drop
 
 ---
 

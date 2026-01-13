@@ -25,6 +25,27 @@ impl WelcomeView {
         self.on_open_repository = Some(Arc::new(handler));
         self
     }
+
+    /// Check if a path is a valid git repository
+    fn is_git_repository(path: &PathBuf) -> bool {
+        // Check for .git directory
+        let git_dir = path.join(".git");
+        if git_dir.exists() {
+            return true;
+        }
+
+        // Check for bare repository (has HEAD and config files)
+        let head = path.join("HEAD");
+        let config = path.join("config");
+        if head.exists() && config.exists() {
+            // Additional check: HEAD file should contain valid git reference
+            if let Ok(content) = std::fs::read_to_string(&head) {
+                return content.starts_with("ref:") || content.len() == 41; // SHA length + newline
+            }
+        }
+
+        false
+    }
 }
 
 impl IntoElement for WelcomeView {
@@ -40,14 +61,39 @@ impl RenderOnce for WelcomeView {
         let recent = self.recent_projects.read(cx);
         let projects: Vec<_> = recent.projects().to_vec();
         let on_open = self.on_open_repository.clone();
+        let on_open_for_drop = on_open.clone();
 
         div()
+            .id("welcome-drop-target")
             .flex()
             .flex_col()
             .items_center()
             .justify_center()
             .size_full()
             .gap_8()
+            // Drop handler for external file drops
+            .on_drop(move |paths: &ExternalPaths, window, cx| {
+                // Find the first valid git repository in dropped paths
+                for path in paths.paths() {
+                    // If it's a file, use its parent directory
+                    let check_path = if path.is_file() {
+                        path.parent().map(|p| p.to_path_buf())
+                    } else {
+                        Some(path.clone())
+                    };
+
+                    if let Some(dir_path) = check_path {
+                        if Self::is_git_repository(&dir_path) {
+                            if let Some(ref handler) = on_open_for_drop {
+                                handler(&dir_path, window, cx);
+                            }
+                            return;
+                        }
+                    }
+                }
+                // No valid git repository found - could show an error toast here
+                log::warn!("Dropped path is not a valid git repository");
+            })
             // Logo / Title
             .child(
                 div()
@@ -68,6 +114,13 @@ impl RenderOnce for WelcomeView {
                             .text_color(rgb(0x9399b2))
                             .child("A fast Git GUI client"),
                     ),
+            )
+            // Drop hint
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(rgb(0x6c7086))
+                    .child("Drop a git repository folder here"),
             )
             // Open Repository Button - dispatches OpenRepository action
             .child(
