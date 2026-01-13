@@ -153,10 +153,10 @@ Migration from VibeWithGraph (Tauri + React) to Awabancha (Rust + gpui)
   - `complete_merge(message)` - Finish merge
   - `abort_merge()` - Cancel merge
 
-- [ ] **Advanced operations**
+- [x] **Advanced operations**
   - `revert_commit(sha, mainline)` - Create undo commit
   - `cherry_pick(sha)` - Apply commit
-  - `reset_to_commit(sha, mode)` - Reset HEAD
+  - `reset_to_commit(sha, mode)` - Reset HEAD (soft/mixed/hard)
 
 ---
 
@@ -341,7 +341,7 @@ Migration from VibeWithGraph (Tauri + React) to Awabancha (Rust + gpui)
 
 ### Phase 12: File Watching
 
-- [ ] **Repository watcher**
+- [x] **Repository watcher**
   - Monitor .git directory
   - Debounced updates (500ms)
   - Filter temporary files

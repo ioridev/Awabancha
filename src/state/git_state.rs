@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
 use crate::git::{
-    BranchInfo, CommitGraphData, CommitInfo, ConflictInfo, ConflictStrategy, FileDiff, FileStatus,
-    RepositoryInfo, StashEntry, TagInfo,
+    self, BranchInfo, CommitGraphData, CommitInfo, ConflictInfo, ConflictStrategy, FileDiff,
+    FileStatus, ResetMode, RepositoryInfo, StashEntry, TagInfo,
 };
 use anyhow::Result;
 use gpui::*;
@@ -527,6 +527,47 @@ impl GitState {
         self.with_repo_mut(
             |repo| {
                 ConflictInfo::abort_merge(repo)?;
+                Ok(())
+            },
+            cx,
+        )
+    }
+
+    // Advanced operations
+    pub fn revert_commit(
+        &mut self,
+        sha: &str,
+        mainline: Option<u32>,
+        cx: &mut Context<Self>,
+    ) -> Result<()> {
+        self.with_repo_mut(
+            |repo| {
+                git::revert_commit(repo, sha, mainline)?;
+                Ok(())
+            },
+            cx,
+        )
+    }
+
+    pub fn cherry_pick(&mut self, sha: &str, cx: &mut Context<Self>) -> Result<()> {
+        self.with_repo_mut(
+            |repo| {
+                git::cherry_pick(repo, sha)?;
+                Ok(())
+            },
+            cx,
+        )
+    }
+
+    pub fn reset_to_commit(
+        &mut self,
+        sha: &str,
+        mode: ResetMode,
+        cx: &mut Context<Self>,
+    ) -> Result<()> {
+        self.with_repo_mut(
+            |repo| {
+                git::reset_to_commit(repo, sha, mode)?;
                 Ok(())
             },
             cx,

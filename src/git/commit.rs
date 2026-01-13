@@ -338,3 +338,112 @@ impl CommitGraphData {
         (nodes, edges, max_column)
     }
 }
+
+/// Reset mode for reset_to_commit
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ResetMode {
+    Soft,
+    Mixed,
+    Hard,
+}
+
+impl ResetMode {
+    pub fn to_git2(self) -> git2::ResetType {
+        match self {
+            ResetMode::Soft => git2::ResetType::Soft,
+            ResetMode::Mixed => git2::ResetType::Mixed,
+            ResetMode::Hard => git2::ResetType::Hard,
+        }
+    }
+}
+
+/// Revert a commit (create an undo commit)
+pub fn revert_commit(repo: &Repository, sha: &str, mainline: Option<u32>) -> Result<Oid> {
+    let oid = git2::Oid::from_str(sha)?;
+    let commit = repo.find_commit(oid)?;
+
+    // For merge commits, mainline specifies which parent to consider as the mainline
+    let mut revert_opts = git2::RevertOptions::new();
+    if let Some(m) = mainline {
+        revert_opts.mainline(m);
+    }
+
+    repo.revert(&commit, Some(&mut revert_opts))?;
+
+    // Create the revert commit
+    let sig = repo.signature()?;
+    let mut index = repo.index()?;
+    let tree_id = index.write_tree()?;
+    let tree = repo.find_tree(tree_id)?;
+    let head = repo.head()?.peel_to_commit()?;
+
+    let message = format!("Revert \"{}\"\n\nThis reverts commit {}.",
+        commit.summary().unwrap_or(""),
+        &sha[..7]);
+
+    let new_commit = repo.commit(
+        Some("HEAD"),
+        &sig,
+        &sig,
+        &message,
+        &tree,
+        &[&head],
+    )?;
+
+    // Clean up state
+    repo.cleanup_state()?;
+
+    Ok(new_commit)
+}
+
+/// Cherry-pick a commit
+pub fn cherry_pick(repo: &Repository, sha: &str) -> Result<Oid> {
+    let oid = git2::Oid::from_str(sha)?;
+    let commit = repo.find_commit(oid)?;
+
+    repo.cherrypick(&commit, None)?;
+
+    // Check for conflicts
+    let index = repo.index()?;
+    if index.has_conflicts() {
+        anyhow::bail!("Cherry-pick resulted in conflicts. Resolve them and commit manually.");
+    }
+
+    // Create the cherry-pick commit
+    let sig = repo.signature()?;
+    let mut index = repo.index()?;
+    let tree_id = index.write_tree()?;
+    let tree = repo.find_tree(tree_id)?;
+    let head = repo.head()?.peel_to_commit()?;
+
+    let message = format!(
+        "{}\n\n(cherry picked from commit {})",
+        commit.message().unwrap_or(""),
+        &sha[..7]
+    );
+
+    let new_commit = repo.commit(
+        Some("HEAD"),
+        &sig,
+        &sig,
+        &message,
+        &tree,
+        &[&head],
+    )?;
+
+    // Clean up state
+    repo.cleanup_state()?;
+
+    Ok(new_commit)
+}
+
+/// Reset HEAD to a specific commit
+pub fn reset_to_commit(repo: &Repository, sha: &str, mode: ResetMode) -> Result<()> {
+    let oid = git2::Oid::from_str(sha)?;
+    let commit = repo.find_commit(oid)?;
+    let obj = commit.into_object();
+
+    repo.reset(&obj, mode.to_git2(), None)?;
+
+    Ok(())
+}
