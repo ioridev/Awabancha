@@ -1,5 +1,6 @@
 use crate::actions::*;
-use crate::state::{GitState, RecentProjects, RepositoryWatcher, SettingsState};
+use crate::components::ToastContainer;
+use crate::state::{GitState, RecentProjects, RepositoryWatcher, SettingsState, ToastState};
 use crate::views::{ConflictDialog, DiffViewer, MainLayout, SettingsView, WelcomeView};
 use gpui::prelude::*;
 use gpui::*;
@@ -25,6 +26,8 @@ pub struct Awabancha {
     pub settings: Entity<SettingsState>,
     /// Recent projects list
     pub recent_projects: Entity<RecentProjects>,
+    /// Toast notifications
+    pub toast_state: Entity<ToastState>,
     /// Current view mode
     pub view_mode: ViewMode,
     /// Show settings modal
@@ -52,6 +55,7 @@ impl Awabancha {
         let git_state = cx.new(|_| GitState::new());
         let settings = cx.new(|cx| SettingsState::load(cx));
         let recent_projects = cx.new(|cx| RecentProjects::load(cx));
+        let toast_state = cx.new(|_| ToastState::new());
 
         // Set up window activation observer for auto-refresh
         let git_state_for_activation = git_state.clone();
@@ -65,11 +69,18 @@ impl Awabancha {
         })
         .detach();
 
+        // Observe toast state for re-renders
+        cx.observe(&toast_state, |_this, _toast_state, cx| {
+            cx.notify();
+        })
+        .detach();
+
         Self {
             repository_path: None,
             git_state,
             settings,
             recent_projects,
+            toast_state,
             view_mode: ViewMode::Welcome,
             show_settings: false,
             show_diff: false,
@@ -284,11 +295,19 @@ impl Awabancha {
     }
 
     fn handle_stage_all(&mut self, _: &StageAll, _window: &mut Window, cx: &mut Context<Self>) {
-        self.git_state.update(cx, |state, cx| {
-            if let Err(e) = state.stage_all(cx) {
-                log::error!("Failed to stage all: {}", e);
+        let result = self.git_state.update(cx, |state, cx| state.stage_all(cx));
+        match result {
+            Ok(_) => {
+                self.toast_state.update(cx, |toast, cx| {
+                    toast.success("All files staged", cx);
+                });
             }
-        });
+            Err(e) => {
+                self.toast_state.update(cx, |toast, cx| {
+                    toast.error(format!("Failed to stage: {}", e), cx);
+                });
+            }
+        }
     }
 
     fn handle_create_commit(
@@ -305,11 +324,19 @@ impl Awabancha {
         let auth = settings.get_auth_credentials();
         let _ = settings;
 
-        self.git_state.update(cx, |state, cx| {
-            if let Err(e) = state.push(auth.as_ref(), cx) {
-                log::error!("Failed to push: {}", e);
+        let result = self.git_state.update(cx, |state, cx| state.push(auth.as_ref(), cx));
+        match result {
+            Ok(_) => {
+                self.toast_state.update(cx, |toast, cx| {
+                    toast.success("Pushed to remote", cx);
+                });
             }
-        });
+            Err(e) => {
+                self.toast_state.update(cx, |toast, cx| {
+                    toast.error(format!("Push failed: {}", e), cx);
+                });
+            }
+        }
     }
 
     fn handle_pull(&mut self, _: &Pull, _window: &mut Window, cx: &mut Context<Self>) {
@@ -317,11 +344,19 @@ impl Awabancha {
         let auth = settings.get_auth_credentials();
         let _ = settings;
 
-        self.git_state.update(cx, |state, cx| {
-            if let Err(e) = state.pull(auth.as_ref(), cx) {
-                log::error!("Failed to pull: {}", e);
+        let result = self.git_state.update(cx, |state, cx| state.pull(auth.as_ref(), cx));
+        match result {
+            Ok(_) => {
+                self.toast_state.update(cx, |toast, cx| {
+                    toast.success("Pulled from remote", cx);
+                });
             }
-        });
+            Err(e) => {
+                self.toast_state.update(cx, |toast, cx| {
+                    toast.error(format!("Pull failed: {}", e), cx);
+                });
+            }
+        }
     }
 }
 
@@ -461,5 +496,7 @@ impl Render for Awabancha {
                         .child(SettingsView::new(settings)),
                 )
             })
+            // Toast notifications (always on top)
+            .child(ToastContainer::new(self.toast_state.clone()))
     }
 }

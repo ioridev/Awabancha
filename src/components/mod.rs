@@ -6,3 +6,4 @@ pub mod modal;
 pub mod toast;
 
 pub use input::*;
+pub use toast::*;

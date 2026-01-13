@@ -1,43 +1,21 @@
 #![allow(dead_code)]
 
+use crate::state::{ToastMessage, ToastState, ToastType};
 use gpui::prelude::*;
 use gpui::*;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum ToastType {
-    Success,
-    Error,
-    Warning,
-    Info,
-}
-
+/// A single toast notification component
 pub struct Toast {
-    message: String,
-    toast_type: ToastType,
+    message: ToastMessage,
+    toast_state: Entity<ToastState>,
 }
 
 impl Toast {
-    pub fn new(message: impl Into<String>, toast_type: ToastType) -> Self {
+    pub fn new(message: ToastMessage, toast_state: Entity<ToastState>) -> Self {
         Self {
-            message: message.into(),
-            toast_type,
+            message,
+            toast_state,
         }
-    }
-
-    pub fn success(message: impl Into<String>) -> Self {
-        Self::new(message, ToastType::Success)
-    }
-
-    pub fn error(message: impl Into<String>) -> Self {
-        Self::new(message, ToastType::Error)
-    }
-
-    pub fn warning(message: impl Into<String>) -> Self {
-        Self::new(message, ToastType::Warning)
-    }
-
-    pub fn info(message: impl Into<String>) -> Self {
-        Self::new(message, ToastType::Info)
     }
 }
 
@@ -51,14 +29,18 @@ impl IntoElement for Toast {
 
 impl RenderOnce for Toast {
     fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
-        let (bg, border, icon) = match self.toast_type {
+        let (bg, border, icon) = match self.message.toast_type {
             ToastType::Success => (rgb(0x1a3d2e), rgb(0xa6e3a1), "✓"),
             ToastType::Error => (rgb(0x3d1a1a), rgb(0xf38ba8), "✕"),
             ToastType::Warning => (rgb(0x3d3d1a), rgb(0xf9e2af), "⚠"),
             ToastType::Info => (rgb(0x1a2a3d), rgb(0x89b4fa), "ℹ"),
         };
 
+        let id = self.message.id;
+        let toast_state = self.toast_state.clone();
+
         div()
+            .id(ElementId::Name(format!("toast-{}", id).into()))
             .flex()
             .items_center()
             .gap_3()
@@ -77,29 +59,35 @@ impl RenderOnce for Toast {
                     .flex_1()
                     .text_sm()
                     .text_color(rgb(0xcdd6f4))
-                    .child(self.message),
+                    .child(self.message.message.clone()),
             )
             // Dismiss button
             .child(
                 div()
-                    .id("toast-dismiss")
+                    .id(ElementId::Name(format!("toast-dismiss-{}", id).into()))
                     .px_1()
                     .text_sm()
                     .text_color(rgb(0x6c7086))
                     .cursor_pointer()
                     .hover(|s| s.text_color(rgb(0xcdd6f4)))
-                    .child("×"),
+                    .child("×")
+                    .on_click(move |_event, _window, cx| {
+                        toast_state.update(cx, |state, cx| {
+                            state.dismiss(id, cx);
+                        });
+                    }),
             )
     }
 }
 
+/// Container for all toast notifications
 pub struct ToastContainer {
-    toasts: Vec<Toast>,
+    toast_state: Entity<ToastState>,
 }
 
 impl ToastContainer {
-    pub fn new(toasts: Vec<Toast>) -> Self {
-        Self { toasts }
+    pub fn new(toast_state: Entity<ToastState>) -> Self {
+        Self { toast_state }
     }
 }
 
@@ -112,7 +100,15 @@ impl IntoElement for ToastContainer {
 }
 
 impl RenderOnce for ToastContainer {
-    fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let toasts: Vec<_> = self
+            .toast_state
+            .read(cx)
+            .toasts()
+            .iter()
+            .cloned()
+            .collect();
+
         div()
             .absolute()
             .bottom_4()
@@ -121,6 +117,10 @@ impl RenderOnce for ToastContainer {
             .flex_col()
             .gap_2()
             .w_80()
-            .children(self.toasts)
+            .children(
+                toasts
+                    .into_iter()
+                    .map(|msg| Toast::new(msg, self.toast_state.clone())),
+            )
     }
 }
