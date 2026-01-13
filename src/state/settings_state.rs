@@ -145,3 +145,105 @@ impl SettingsState {
         cx.notify();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_auth_mode_default() {
+        let default: AuthMode = Default::default();
+        assert_eq!(default, AuthMode::Https);
+    }
+
+    #[test]
+    fn test_auth_mode_equality() {
+        assert_eq!(AuthMode::Https, AuthMode::Https);
+        assert_eq!(AuthMode::Ssh, AuthMode::Ssh);
+        assert_ne!(AuthMode::Https, AuthMode::Ssh);
+    }
+
+    #[test]
+    fn test_merge_mode_default() {
+        let default: MergeMode = Default::default();
+        assert_eq!(default, MergeMode::Auto);
+    }
+
+    #[test]
+    fn test_merge_mode_equality() {
+        assert_eq!(MergeMode::Auto, MergeMode::Auto);
+        assert_eq!(MergeMode::FfOnly, MergeMode::FfOnly);
+        assert_eq!(MergeMode::NoFf, MergeMode::NoFf);
+        assert_eq!(MergeMode::Squash, MergeMode::Squash);
+        assert_ne!(MergeMode::Auto, MergeMode::Squash);
+    }
+
+    #[test]
+    fn test_theme_default() {
+        let default: Theme = Default::default();
+        assert_eq!(default, Theme::Dark);
+    }
+
+    #[test]
+    fn test_theme_equality() {
+        assert_eq!(Theme::Dark, Theme::Dark);
+        assert_eq!(Theme::Light, Theme::Light);
+        assert_ne!(Theme::Dark, Theme::Light);
+    }
+
+    #[test]
+    fn test_settings_data_default() {
+        let settings = SettingsData::default();
+        assert_eq!(settings.git_auth_mode, AuthMode::Https);
+        assert!(settings.git_username.is_none());
+        assert!(settings.git_token.is_none());
+        assert_eq!(settings.merge_mode, MergeMode::Auto);
+        assert_eq!(settings.theme, Theme::Dark);
+        assert_eq!(settings.locale, Locale::En);
+    }
+
+    #[test]
+    fn test_settings_data_serialization() {
+        let settings = SettingsData::default();
+        let json = serde_json::to_string(&settings).unwrap();
+        let deserialized: SettingsData = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(settings.git_auth_mode, deserialized.git_auth_mode);
+        assert_eq!(settings.merge_mode, deserialized.merge_mode);
+        assert_eq!(settings.theme, deserialized.theme);
+        assert_eq!(settings.locale, deserialized.locale);
+    }
+
+    #[test]
+    fn test_settings_data_with_values() {
+        let settings = SettingsData {
+            git_auth_mode: AuthMode::Ssh,
+            git_username: Some("testuser".to_string()),
+            git_token: Some("testtoken".to_string()),
+            merge_mode: MergeMode::FfOnly,
+            theme: Theme::Light,
+            locale: Locale::Ja,
+        };
+
+        let json = serde_json::to_string(&settings).unwrap();
+        let deserialized: SettingsData = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.git_auth_mode, AuthMode::Ssh);
+        assert_eq!(deserialized.git_username, Some("testuser".to_string()));
+        assert_eq!(deserialized.git_token, Some("testtoken".to_string()));
+        assert_eq!(deserialized.merge_mode, MergeMode::FfOnly);
+        assert_eq!(deserialized.theme, Theme::Light);
+        assert_eq!(deserialized.locale, Locale::Ja);
+    }
+
+    #[test]
+    fn test_settings_path_is_some() {
+        // settings_path should return Some on systems with a config directory
+        // This might fail on some CI systems, but should work locally
+        let path = SettingsState::settings_path();
+        // We just test that it doesn't panic and returns a reasonable result
+        if let Some(p) = path {
+            assert!(p.to_string_lossy().contains("awabancha"));
+        }
+    }
+}

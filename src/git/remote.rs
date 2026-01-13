@@ -137,3 +137,142 @@ pub fn pull_from_remote(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn create_test_repo() -> (TempDir, Repository) {
+        let temp_dir = TempDir::new().unwrap();
+        let repo = Repository::init(temp_dir.path()).unwrap();
+
+        let mut config = repo.config().unwrap();
+        config.set_str("user.name", "Test User").unwrap();
+        config.set_str("user.email", "test@example.com").unwrap();
+
+        (temp_dir, repo)
+    }
+
+    #[test]
+    fn test_remote_info_creation() {
+        let info = RemoteInfo {
+            name: "origin".to_string(),
+            url: "https://github.com/user/repo.git".to_string(),
+            push_url: None,
+        };
+
+        assert_eq!(info.name, "origin");
+        assert_eq!(info.url, "https://github.com/user/repo.git");
+        assert!(info.push_url.is_none());
+    }
+
+    #[test]
+    fn test_remote_info_with_push_url() {
+        let info = RemoteInfo {
+            name: "origin".to_string(),
+            url: "git@github.com:user/repo.git".to_string(),
+            push_url: Some("git@github.com:user/repo.git".to_string()),
+        };
+
+        assert_eq!(info.name, "origin");
+        assert!(info.push_url.is_some());
+    }
+
+    #[test]
+    fn test_remote_info_clone() {
+        let info = RemoteInfo {
+            name: "upstream".to_string(),
+            url: "https://github.com/original/repo.git".to_string(),
+            push_url: Some("https://github.com/fork/repo.git".to_string()),
+        };
+
+        let cloned = info.clone();
+        assert_eq!(info.name, cloned.name);
+        assert_eq!(info.url, cloned.url);
+        assert_eq!(info.push_url, cloned.push_url);
+    }
+
+    #[test]
+    fn test_get_all_remotes_empty() {
+        let (_temp_dir, repo) = create_test_repo();
+
+        let remotes = RemoteInfo::get_all(&repo).unwrap();
+        assert!(remotes.is_empty());
+    }
+
+    #[test]
+    fn test_add_remote() {
+        let (_temp_dir, repo) = create_test_repo();
+
+        let result = RemoteInfo::add(&repo, "origin", "https://github.com/test/repo.git");
+        assert!(result.is_ok());
+
+        let remotes = RemoteInfo::get_all(&repo).unwrap();
+        assert_eq!(remotes.len(), 1);
+        assert_eq!(remotes[0].name, "origin");
+        assert_eq!(remotes[0].url, "https://github.com/test/repo.git");
+    }
+
+    #[test]
+    fn test_remove_remote() {
+        let (_temp_dir, repo) = create_test_repo();
+
+        RemoteInfo::add(&repo, "origin", "https://github.com/test/repo.git").unwrap();
+        assert_eq!(RemoteInfo::get_all(&repo).unwrap().len(), 1);
+
+        let result = RemoteInfo::remove(&repo, "origin");
+        assert!(result.is_ok());
+        assert_eq!(RemoteInfo::get_all(&repo).unwrap().len(), 0);
+    }
+
+    #[test]
+    fn test_set_remote_url() {
+        let (_temp_dir, repo) = create_test_repo();
+
+        RemoteInfo::add(&repo, "origin", "https://github.com/test/repo.git").unwrap();
+
+        let result = RemoteInfo::set_url(&repo, "origin", "https://github.com/new/repo.git");
+        assert!(result.is_ok());
+
+        let remotes = RemoteInfo::get_all(&repo).unwrap();
+        assert_eq!(remotes[0].url, "https://github.com/new/repo.git");
+    }
+
+    #[test]
+    fn test_multiple_remotes() {
+        let (_temp_dir, repo) = create_test_repo();
+
+        RemoteInfo::add(&repo, "origin", "https://github.com/user/repo.git").unwrap();
+        RemoteInfo::add(&repo, "upstream", "https://github.com/original/repo.git").unwrap();
+
+        let remotes = RemoteInfo::get_all(&repo).unwrap();
+        assert_eq!(remotes.len(), 2);
+
+        let names: Vec<&str> = remotes.iter().map(|r| r.name.as_str()).collect();
+        assert!(names.contains(&"origin"));
+        assert!(names.contains(&"upstream"));
+    }
+
+    #[test]
+    fn test_remote_auth_creation() {
+        let auth = RemoteAuth {
+            username: "testuser".to_string(),
+            password: "testpassword".to_string(),
+        };
+
+        assert_eq!(auth.username, "testuser");
+        assert_eq!(auth.password, "testpassword");
+    }
+
+    #[test]
+    fn test_remote_auth_create_callbacks() {
+        let auth = RemoteAuth {
+            username: "user".to_string(),
+            password: "pass".to_string(),
+        };
+
+        // Just verify it doesn't panic
+        let _callbacks = auth.create_callbacks();
+    }
+}

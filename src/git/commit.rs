@@ -447,3 +447,421 @@ pub fn reset_to_commit(repo: &Repository, sha: &str, mode: ResetMode) -> Result<
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+    use chrono::Duration;
+
+    fn create_test_repo() -> (TempDir, Repository) {
+        let temp_dir = TempDir::new().unwrap();
+        let repo = Repository::init(temp_dir.path()).unwrap();
+
+        let mut config = repo.config().unwrap();
+        config.set_str("user.name", "Test User").unwrap();
+        config.set_str("user.email", "test@example.com").unwrap();
+
+        (temp_dir, repo)
+    }
+
+    fn create_initial_commit(temp_dir: &TempDir, repo: &Repository) -> Oid {
+        let file_path = temp_dir.path().join("test.txt");
+        fs::write(&file_path, "initial content").unwrap();
+
+        let mut index = repo.index().unwrap();
+        index.add_path(std::path::Path::new("test.txt")).unwrap();
+        index.write().unwrap();
+
+        let sig = repo.signature().unwrap();
+        let tree_id = index.write_tree().unwrap();
+        let tree = repo.find_tree(tree_id).unwrap();
+
+        repo.commit(Some("HEAD"), &sig, &sig, "Initial commit", &tree, &[])
+            .unwrap()
+    }
+
+    fn create_second_commit(temp_dir: &TempDir, repo: &Repository) -> Oid {
+        let file_path = temp_dir.path().join("test.txt");
+        fs::write(&file_path, "second content").unwrap();
+
+        let mut index = repo.index().unwrap();
+        index.add_path(std::path::Path::new("test.txt")).unwrap();
+        index.write().unwrap();
+
+        let sig = repo.signature().unwrap();
+        let tree_id = index.write_tree().unwrap();
+        let tree = repo.find_tree(tree_id).unwrap();
+
+        let head = repo.head().unwrap().peel_to_commit().unwrap();
+
+        repo.commit(Some("HEAD"), &sig, &sig, "Second commit", &tree, &[&head])
+            .unwrap()
+    }
+
+    #[test]
+    fn test_reset_mode_to_git2() {
+        assert!(matches!(
+            ResetMode::Soft.to_git2(),
+            git2::ResetType::Soft
+        ));
+        assert!(matches!(
+            ResetMode::Mixed.to_git2(),
+            git2::ResetType::Mixed
+        ));
+        assert!(matches!(
+            ResetMode::Hard.to_git2(),
+            git2::ResetType::Hard
+        ));
+    }
+
+    #[test]
+    fn test_reset_mode_equality() {
+        assert_eq!(ResetMode::Soft, ResetMode::Soft);
+        assert_ne!(ResetMode::Soft, ResetMode::Hard);
+    }
+
+    #[test]
+    fn test_reset_mode_clone() {
+        let mode = ResetMode::Mixed;
+        let cloned = mode;
+        assert_eq!(mode, cloned);
+    }
+
+    #[test]
+    fn test_edge_type_equality() {
+        assert_eq!(EdgeType::Linear, EdgeType::Linear);
+        assert_ne!(EdgeType::Linear, EdgeType::Branch);
+        assert_ne!(EdgeType::Branch, EdgeType::Merge);
+    }
+
+    #[test]
+    fn test_edge_type_clone() {
+        let edge_type = EdgeType::Merge;
+        let cloned = edge_type;
+        assert_eq!(edge_type, cloned);
+    }
+
+    #[test]
+    fn test_commit_info_creation() {
+        let commit_info = CommitInfo {
+            sha: "abcdef1234567890".to_string(),
+            short_sha: "abcdef1".to_string(),
+            message: "Test commit".to_string(),
+            author: "Test Author".to_string(),
+            email: "test@example.com".to_string(),
+            timestamp: Utc::now(),
+            parents: vec!["parent1".to_string()],
+            branch: Some("main".to_string()),
+            branches: vec!["main".to_string()],
+            remotes: vec![],
+            tags: vec!["v1.0".to_string()],
+        };
+
+        assert_eq!(commit_info.sha, "abcdef1234567890");
+        assert_eq!(commit_info.short_sha, "abcdef1");
+        assert_eq!(commit_info.message, "Test commit");
+        assert_eq!(commit_info.author, "Test Author");
+        assert_eq!(commit_info.email, "test@example.com");
+        assert_eq!(commit_info.parents.len(), 1);
+        assert_eq!(commit_info.branch, Some("main".to_string()));
+        assert_eq!(commit_info.tags.len(), 1);
+    }
+
+    #[test]
+    fn test_commit_info_clone() {
+        let commit_info = CommitInfo {
+            sha: "abc123".to_string(),
+            short_sha: "abc123".to_string(),
+            message: "Test".to_string(),
+            author: "Author".to_string(),
+            email: "email@test.com".to_string(),
+            timestamp: Utc::now(),
+            parents: vec![],
+            branch: None,
+            branches: vec![],
+            remotes: vec![],
+            tags: vec![],
+        };
+
+        let cloned = commit_info.clone();
+        assert_eq!(commit_info.sha, cloned.sha);
+        assert_eq!(commit_info.message, cloned.message);
+    }
+
+    #[test]
+    fn test_commit_info_short_sha() {
+        let sha = "abcdef1234567890abcdef1234567890abcdef12";
+        let short = &sha[..7];
+        assert_eq!(short, "abcdef1");
+    }
+
+    #[test]
+    fn test_commit_info_relative_time_just_now() {
+        let commit_info = CommitInfo {
+            sha: "abc".to_string(),
+            short_sha: "abc".to_string(),
+            message: "test".to_string(),
+            author: "author".to_string(),
+            email: "email@test.com".to_string(),
+            timestamp: Utc::now(),
+            parents: vec![],
+            branch: None,
+            branches: vec![],
+            remotes: vec![],
+            tags: vec![],
+        };
+
+        let relative = commit_info.relative_time();
+        assert!(relative == "just now" || relative.contains("minute"));
+    }
+
+    #[test]
+    fn test_commit_info_relative_time_hours() {
+        let commit_info = CommitInfo {
+            sha: "abc".to_string(),
+            short_sha: "abc".to_string(),
+            message: "test".to_string(),
+            author: "author".to_string(),
+            email: "email@test.com".to_string(),
+            timestamp: Utc::now() - Duration::hours(5),
+            parents: vec![],
+            branch: None,
+            branches: vec![],
+            remotes: vec![],
+            tags: vec![],
+        };
+
+        let relative = commit_info.relative_time();
+        assert!(relative.contains("hours ago"));
+    }
+
+    #[test]
+    fn test_commit_info_relative_time_days() {
+        let commit_info = CommitInfo {
+            sha: "abc".to_string(),
+            short_sha: "abc".to_string(),
+            message: "test".to_string(),
+            author: "author".to_string(),
+            email: "email@test.com".to_string(),
+            timestamp: Utc::now() - Duration::days(3),
+            parents: vec![],
+            branch: None,
+            branches: vec![],
+            remotes: vec![],
+            tags: vec![],
+        };
+
+        let relative = commit_info.relative_time();
+        assert!(relative.contains("days ago"));
+    }
+
+    #[test]
+    fn test_commit_info_relative_time_weeks() {
+        let commit_info = CommitInfo {
+            sha: "abc".to_string(),
+            short_sha: "abc".to_string(),
+            message: "test".to_string(),
+            author: "author".to_string(),
+            email: "email@test.com".to_string(),
+            timestamp: Utc::now() - Duration::weeks(2),
+            parents: vec![],
+            branch: None,
+            branches: vec![],
+            remotes: vec![],
+            tags: vec![],
+        };
+
+        let relative = commit_info.relative_time();
+        assert!(relative.contains("weeks ago"));
+    }
+
+    #[test]
+    fn test_commit_info_relative_time_months() {
+        let commit_info = CommitInfo {
+            sha: "abc".to_string(),
+            short_sha: "abc".to_string(),
+            message: "test".to_string(),
+            author: "author".to_string(),
+            email: "email@test.com".to_string(),
+            timestamp: Utc::now() - Duration::days(60),
+            parents: vec![],
+            branch: None,
+            branches: vec![],
+            remotes: vec![],
+            tags: vec![],
+        };
+
+        let relative = commit_info.relative_time();
+        assert!(relative.contains("months ago"));
+    }
+
+    #[test]
+    fn test_commit_info_relative_time_years() {
+        let commit_info = CommitInfo {
+            sha: "abc".to_string(),
+            short_sha: "abc".to_string(),
+            message: "test".to_string(),
+            author: "author".to_string(),
+            email: "email@test.com".to_string(),
+            timestamp: Utc::now() - Duration::days(400),
+            parents: vec![],
+            branch: None,
+            branches: vec![],
+            remotes: vec![],
+            tags: vec![],
+        };
+
+        let relative = commit_info.relative_time();
+        assert!(relative.contains("years ago"));
+    }
+
+    #[test]
+    fn test_graph_node_creation() {
+        let node = GraphNode {
+            commit: CommitInfo {
+                sha: "abc1234".to_string(),
+                short_sha: "abc1234".to_string(),
+                message: "Test commit".to_string(),
+                author: "Test Author".to_string(),
+                email: "test@example.com".to_string(),
+                timestamp: Utc::now(),
+                parents: vec![],
+                branch: None,
+                branches: vec![],
+                remotes: vec![],
+                tags: vec![],
+            },
+            column: 0,
+            row: 0,
+            color: 0x89b4fa,
+        };
+
+        assert_eq!(node.column, 0);
+        assert_eq!(node.row, 0);
+        assert_eq!(node.commit.message, "Test commit");
+    }
+
+    #[test]
+    fn test_graph_node_clone() {
+        let node = GraphNode {
+            commit: CommitInfo {
+                sha: "abc".to_string(),
+                short_sha: "abc".to_string(),
+                message: "Test".to_string(),
+                author: "Author".to_string(),
+                email: "email".to_string(),
+                timestamp: Utc::now(),
+                parents: vec![],
+                branch: None,
+                branches: vec![],
+                remotes: vec![],
+                tags: vec![],
+            },
+            column: 1,
+            row: 2,
+            color: 0xffffff,
+        };
+
+        let cloned = node.clone();
+        assert_eq!(node.column, cloned.column);
+        assert_eq!(node.row, cloned.row);
+        assert_eq!(node.color, cloned.color);
+    }
+
+    #[test]
+    fn test_graph_edge_creation() {
+        let edge = GraphEdge {
+            from_sha: "abc1234".to_string(),
+            to_sha: "def5678".to_string(),
+            from_column: 0,
+            to_column: 1,
+            from_row: 0,
+            to_row: 1,
+            color: 0xa6e3a1,
+            edge_type: EdgeType::Branch,
+        };
+
+        assert_eq!(edge.from_column, 0);
+        assert_eq!(edge.to_column, 1);
+        assert_eq!(edge.edge_type, EdgeType::Branch);
+    }
+
+    #[test]
+    fn test_graph_edge_clone() {
+        let edge = GraphEdge {
+            from_sha: "abc".to_string(),
+            to_sha: "def".to_string(),
+            from_column: 0,
+            to_column: 0,
+            from_row: 0,
+            to_row: 1,
+            color: 0x123456,
+            edge_type: EdgeType::Linear,
+        };
+
+        let cloned = edge.clone();
+        assert_eq!(edge.from_sha, cloned.from_sha);
+        assert_eq!(edge.to_sha, cloned.to_sha);
+        assert_eq!(edge.edge_type, cloned.edge_type);
+    }
+
+    #[test]
+    fn test_commit_graph_data_build() {
+        let (temp_dir, repo) = create_test_repo();
+        create_initial_commit(&temp_dir, &repo);
+        create_second_commit(&temp_dir, &repo);
+
+        let graph = CommitGraphData::build(&repo, 10, 0).unwrap();
+        assert!(!graph.nodes.is_empty());
+        assert_eq!(graph.nodes.len(), 2);
+    }
+
+    #[test]
+    fn test_commit_graph_data_clone() {
+        let graph = CommitGraphData {
+            nodes: vec![],
+            edges: vec![],
+            max_column: 0,
+        };
+
+        let cloned = graph.clone();
+        assert_eq!(graph.max_column, cloned.max_column);
+    }
+
+    #[test]
+    fn test_reset_to_commit() {
+        let (temp_dir, repo) = create_test_repo();
+        let first_oid = create_initial_commit(&temp_dir, &repo);
+        create_second_commit(&temp_dir, &repo);
+
+        // Reset to first commit
+        let result = reset_to_commit(&repo, &first_oid.to_string(), ResetMode::Hard);
+        assert!(result.is_ok());
+
+        // Verify HEAD is at first commit
+        let head = repo.head().unwrap().peel_to_commit().unwrap();
+        assert_eq!(head.id(), first_oid);
+    }
+
+    #[test]
+    fn test_reset_to_commit_soft() {
+        let (temp_dir, repo) = create_test_repo();
+        let first_oid = create_initial_commit(&temp_dir, &repo);
+        create_second_commit(&temp_dir, &repo);
+
+        let result = reset_to_commit(&repo, &first_oid.to_string(), ResetMode::Soft);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_reset_to_commit_mixed() {
+        let (temp_dir, repo) = create_test_repo();
+        let first_oid = create_initial_commit(&temp_dir, &repo);
+        create_second_commit(&temp_dir, &repo);
+
+        let result = reset_to_commit(&repo, &first_oid.to_string(), ResetMode::Mixed);
+        assert!(result.is_ok());
+    }
+}

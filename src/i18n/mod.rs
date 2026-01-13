@@ -98,3 +98,114 @@ pub fn format_relative_time(locale: Locale, days: i64) -> String {
         t_with_vars(locale, "time.yearsAgo", &[("years", &years.to_string())])
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_locale_code() {
+        assert_eq!(Locale::En.code(), "en");
+        assert_eq!(Locale::Ja.code(), "ja");
+        assert_eq!(Locale::ZhHans.code(), "zh-Hans");
+        assert_eq!(Locale::ZhHant.code(), "zh-Hant");
+    }
+
+    #[test]
+    fn test_locale_display_name() {
+        assert_eq!(Locale::En.display_name(), "English");
+        assert_eq!(Locale::Ja.display_name(), "日本語");
+        assert_eq!(Locale::ZhHans.display_name(), "简体中文");
+        assert_eq!(Locale::ZhHant.display_name(), "繁體中文");
+    }
+
+    #[test]
+    fn test_locale_all() {
+        let all = Locale::all();
+        assert_eq!(all.len(), 4);
+        assert!(all.contains(&Locale::En));
+        assert!(all.contains(&Locale::Ja));
+        assert!(all.contains(&Locale::ZhHans));
+        assert!(all.contains(&Locale::ZhHant));
+    }
+
+    #[test]
+    fn test_locale_default() {
+        let default: Locale = Default::default();
+        assert_eq!(default, Locale::En);
+    }
+
+    #[test]
+    fn test_locale_equality() {
+        assert_eq!(Locale::En, Locale::En);
+        assert_ne!(Locale::En, Locale::Ja);
+    }
+
+    #[test]
+    fn test_translation_basic() {
+        // Test that we get a translation (not the key back)
+        let result = t(Locale::En, "app.name");
+        // The translation should exist
+        assert!(!result.is_empty());
+    }
+
+    #[test]
+    fn test_translation_fallback_to_english() {
+        // Test fallback: use a key that exists in English
+        let en_result = t(Locale::En, "app.name");
+        let ja_result = t(Locale::Ja, "app.name");
+
+        // Both should return something (not empty)
+        assert!(!en_result.is_empty());
+        assert!(!ja_result.is_empty());
+    }
+
+    #[test]
+    fn test_translation_missing_key_returns_key() {
+        let result = t(Locale::En, "nonexistent.key.that.does.not.exist");
+        assert_eq!(result, "nonexistent.key.that.does.not.exist");
+    }
+
+    #[test]
+    fn test_t_with_vars_substitution() {
+        // Test variable substitution
+        let result = t_with_vars(Locale::En, "time.daysAgo", &[("days", "5")]);
+        assert!(result.contains("5"));
+    }
+
+    #[test]
+    fn test_format_relative_time_today() {
+        let result = format_relative_time(Locale::En, 0);
+        assert!(!result.is_empty());
+    }
+
+    #[test]
+    fn test_format_relative_time_yesterday() {
+        let result = format_relative_time(Locale::En, 1);
+        assert!(!result.is_empty());
+    }
+
+    #[test]
+    fn test_format_relative_time_days() {
+        let result = format_relative_time(Locale::En, 3);
+        assert!(result.contains("3"));
+    }
+
+    #[test]
+    fn test_format_relative_time_weeks() {
+        let result = format_relative_time(Locale::En, 14);
+        assert!(result.contains("2")); // 2 weeks
+    }
+
+    #[test]
+    fn test_format_relative_time_months() {
+        let result = format_relative_time(Locale::En, 60);
+        assert!(result.contains("2")); // 2 months
+    }
+
+    #[test]
+    fn test_format_relative_time_years() {
+        let result = format_relative_time(Locale::En, 400);
+        assert!(result.contains("1")); // 1 year
+    }
+}

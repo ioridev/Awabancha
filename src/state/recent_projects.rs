@@ -86,3 +86,77 @@ impl RecentProjects {
         &self.data.projects
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_recent_project_creation() {
+        let project = RecentProject {
+            path: PathBuf::from("/test/path"),
+            name: "test-project".to_string(),
+            last_opened: Utc::now(),
+        };
+
+        assert_eq!(project.path, PathBuf::from("/test/path"));
+        assert_eq!(project.name, "test-project");
+    }
+
+    #[test]
+    fn test_recent_projects_data_default() {
+        let data = RecentProjectsData::default();
+        assert!(data.projects.is_empty());
+    }
+
+    #[test]
+    fn test_recent_project_serialization() {
+        let project = RecentProject {
+            path: PathBuf::from("/test/path"),
+            name: "test-project".to_string(),
+            last_opened: Utc::now(),
+        };
+
+        let json = serde_json::to_string(&project).unwrap();
+        let deserialized: RecentProject = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(project.path, deserialized.path);
+        assert_eq!(project.name, deserialized.name);
+    }
+
+    #[test]
+    fn test_recent_projects_data_serialization() {
+        let mut data = RecentProjectsData::default();
+        data.projects.push(RecentProject {
+            path: PathBuf::from("/test/path1"),
+            name: "project1".to_string(),
+            last_opened: Utc::now(),
+        });
+        data.projects.push(RecentProject {
+            path: PathBuf::from("/test/path2"),
+            name: "project2".to_string(),
+            last_opened: Utc::now(),
+        });
+
+        let json = serde_json::to_string(&data).unwrap();
+        let deserialized: RecentProjectsData = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.projects.len(), 2);
+        assert_eq!(deserialized.projects[0].name, "project1");
+        assert_eq!(deserialized.projects[1].name, "project2");
+    }
+
+    #[test]
+    fn test_storage_path_is_some() {
+        let path = RecentProjects::storage_path();
+        if let Some(p) = path {
+            assert!(p.to_string_lossy().contains("awabancha"));
+            assert!(p.to_string_lossy().contains("recent_projects"));
+        }
+    }
+
+    #[test]
+    fn test_max_recent_projects_constant() {
+        assert_eq!(MAX_RECENT_PROJECTS, 10);
+    }
+}

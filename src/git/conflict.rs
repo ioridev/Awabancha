@@ -211,3 +211,198 @@ pub enum ConflictStrategy {
     Ours,
     Theirs,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn create_test_repo() -> (TempDir, Repository) {
+        let temp_dir = TempDir::new().unwrap();
+        let repo = Repository::init(temp_dir.path()).unwrap();
+
+        let mut config = repo.config().unwrap();
+        config.set_str("user.name", "Test User").unwrap();
+        config.set_str("user.email", "test@example.com").unwrap();
+
+        (temp_dir, repo)
+    }
+
+    fn create_initial_commit(repo: &Repository) -> git2::Oid {
+        let sig = repo.signature().unwrap();
+        let tree_id = {
+            let mut index = repo.index().unwrap();
+            index.write_tree().unwrap()
+        };
+        let tree = repo.find_tree(tree_id).unwrap();
+
+        repo.commit(Some("HEAD"), &sig, &sig, "Initial commit", &tree, &[])
+            .unwrap()
+    }
+
+    #[test]
+    fn test_conflict_strategy_equality() {
+        assert_eq!(ConflictStrategy::Ours, ConflictStrategy::Ours);
+        assert_eq!(ConflictStrategy::Theirs, ConflictStrategy::Theirs);
+        assert_ne!(ConflictStrategy::Ours, ConflictStrategy::Theirs);
+    }
+
+    #[test]
+    fn test_conflict_strategy_clone() {
+        let strategy = ConflictStrategy::Ours;
+        let cloned = strategy;
+        assert_eq!(strategy, cloned);
+    }
+
+    #[test]
+    fn test_conflicted_file_creation() {
+        let file = ConflictedFile {
+            path: "src/main.rs".to_string(),
+            is_deleted_by_us: false,
+            is_deleted_by_them: false,
+        };
+
+        assert_eq!(file.path, "src/main.rs");
+        assert!(!file.is_deleted_by_us);
+        assert!(!file.is_deleted_by_them);
+    }
+
+    #[test]
+    fn test_conflicted_file_deleted_by_us() {
+        let file = ConflictedFile {
+            path: "deleted_file.rs".to_string(),
+            is_deleted_by_us: true,
+            is_deleted_by_them: false,
+        };
+
+        assert!(file.is_deleted_by_us);
+        assert!(!file.is_deleted_by_them);
+    }
+
+    #[test]
+    fn test_conflicted_file_clone() {
+        let file = ConflictedFile {
+            path: "test.rs".to_string(),
+            is_deleted_by_us: false,
+            is_deleted_by_them: true,
+        };
+
+        let cloned = file.clone();
+        assert_eq!(file.path, cloned.path);
+        assert_eq!(file.is_deleted_by_us, cloned.is_deleted_by_us);
+        assert_eq!(file.is_deleted_by_them, cloned.is_deleted_by_them);
+    }
+
+    #[test]
+    fn test_conflict_info_creation() {
+        let info = ConflictInfo {
+            conflicted_files: vec![
+                ConflictedFile {
+                    path: "file1.rs".to_string(),
+                    is_deleted_by_us: false,
+                    is_deleted_by_them: false,
+                },
+                ConflictedFile {
+                    path: "file2.rs".to_string(),
+                    is_deleted_by_us: true,
+                    is_deleted_by_them: false,
+                },
+            ],
+            source_branch: Some("feature".to_string()),
+            target_branch: Some("main".to_string()),
+            is_merging: true,
+        };
+
+        assert_eq!(info.conflicted_files.len(), 2);
+        assert_eq!(info.source_branch, Some("feature".to_string()));
+        assert_eq!(info.target_branch, Some("main".to_string()));
+        assert!(info.is_merging);
+    }
+
+    #[test]
+    fn test_conflict_info_clone() {
+        let info = ConflictInfo {
+            conflicted_files: vec![],
+            source_branch: Some("dev".to_string()),
+            target_branch: Some("main".to_string()),
+            is_merging: false,
+        };
+
+        let cloned = info.clone();
+        assert_eq!(info.source_branch, cloned.source_branch);
+        assert_eq!(info.target_branch, cloned.target_branch);
+        assert_eq!(info.is_merging, cloned.is_merging);
+    }
+
+    #[test]
+    fn test_conflict_info_get_no_conflict() {
+        let (_temp_dir, repo) = create_test_repo();
+        create_initial_commit(&repo);
+
+        let result = ConflictInfo::get(&repo).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_conflict_info_without_merge_state() {
+        // When repo is in normal state (not merging), should return None
+        let (_temp_dir, repo) = create_test_repo();
+        create_initial_commit(&repo);
+
+        // Repo should be in Clean state
+        assert_eq!(repo.state(), git2::RepositoryState::Clean);
+
+        let result = ConflictInfo::get(&repo).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_conflict_info_default_values() {
+        let info = ConflictInfo {
+            conflicted_files: vec![],
+            source_branch: None,
+            target_branch: None,
+            is_merging: false,
+        };
+
+        assert!(info.conflicted_files.is_empty());
+        assert!(info.source_branch.is_none());
+        assert!(info.target_branch.is_none());
+        assert!(!info.is_merging);
+    }
+
+    #[test]
+    fn test_conflicted_file_debug() {
+        let file = ConflictedFile {
+            path: "test.rs".to_string(),
+            is_deleted_by_us: false,
+            is_deleted_by_them: false,
+        };
+
+        let debug_str = format!("{:?}", file);
+        assert!(debug_str.contains("test.rs"));
+    }
+
+    #[test]
+    fn test_conflict_info_debug() {
+        let info = ConflictInfo {
+            conflicted_files: vec![],
+            source_branch: Some("feature".to_string()),
+            target_branch: Some("main".to_string()),
+            is_merging: true,
+        };
+
+        let debug_str = format!("{:?}", info);
+        assert!(debug_str.contains("feature"));
+        assert!(debug_str.contains("main"));
+    }
+
+    #[test]
+    fn test_conflict_strategy_debug() {
+        let ours = ConflictStrategy::Ours;
+        let theirs = ConflictStrategy::Theirs;
+
+        assert_eq!(format!("{:?}", ours), "Ours");
+        assert_eq!(format!("{:?}", theirs), "Theirs");
+    }
+}

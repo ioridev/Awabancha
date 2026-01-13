@@ -7,6 +7,10 @@ description = "A fast Git GUI client built with gpui"
 license = "MIT"
 repository = "https://github.com/awabancha/awabancha"
 
+[lib]
+name = "awabancha"
+path = "src/lib.rs"
+
 [[bin]]
 name = "awabancha"
 path = "src/main.rs"
@@ -27,6 +31,9 @@ log = "0.4"
 env_logger = "0.11"
 uuid = { version = "1.0", features = ["v4"] }
 unicode-segmentation = "1.12"
+
+[dev-dependencies]
+tempfile = "3.15"
 
 [features]
 default = []

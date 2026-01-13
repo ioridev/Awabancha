@@ -88,3 +88,94 @@ impl RepositoryInfo {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    /// Create a temporary git repository for testing
+    fn create_test_repo() -> (TempDir, Repository) {
+        let temp_dir = TempDir::new().unwrap();
+        let repo = Repository::init(temp_dir.path()).unwrap();
+
+        // Configure user for commits
+        let mut config = repo.config().unwrap();
+        config.set_str("user.name", "Test User").unwrap();
+        config.set_str("user.email", "test@example.com").unwrap();
+
+        (temp_dir, repo)
+    }
+
+    /// Create initial commit in repo
+    fn create_initial_commit(repo: &Repository) -> git2::Oid {
+        let sig = repo.signature().unwrap();
+        let tree_id = {
+            let mut index = repo.index().unwrap();
+            index.write_tree().unwrap()
+        };
+        let tree = repo.find_tree(tree_id).unwrap();
+
+        repo.commit(Some("HEAD"), &sig, &sig, "Initial commit", &tree, &[])
+            .unwrap()
+    }
+
+    #[test]
+    fn test_repository_info_from_new_repo() {
+        let (_temp_dir, repo) = create_test_repo();
+
+        // Create initial commit so HEAD is valid
+        create_initial_commit(&repo);
+
+        let info = RepositoryInfo::from_repo(&repo).unwrap();
+
+        assert!(info.current_branch.is_some());
+        // New repos typically have "main" or "master" as default branch
+        let branch = info.current_branch.unwrap();
+        assert!(branch == "main" || branch == "master");
+        assert!(!info.is_detached);
+        assert_eq!(info.ahead, 0);
+        assert_eq!(info.behind, 0);
+        assert!(info.remote_name.is_none()); // No remote configured
+        assert!(info.remote_url.is_none());
+    }
+
+    #[test]
+    fn test_repository_info_clone() {
+        let (_temp_dir, repo) = create_test_repo();
+        create_initial_commit(&repo);
+
+        let info = RepositoryInfo::from_repo(&repo).unwrap();
+        let cloned = info.clone();
+
+        assert_eq!(info.current_branch, cloned.current_branch);
+        assert_eq!(info.is_detached, cloned.is_detached);
+        assert_eq!(info.ahead, cloned.ahead);
+        assert_eq!(info.behind, cloned.behind);
+    }
+
+    #[test]
+    fn test_repository_with_file() {
+        let (temp_dir, repo) = create_test_repo();
+
+        // Create a file
+        let file_path = temp_dir.path().join("test.txt");
+        fs::write(&file_path, "Hello, World!").unwrap();
+
+        // Stage the file
+        let mut index = repo.index().unwrap();
+        index.add_path(std::path::Path::new("test.txt")).unwrap();
+        index.write().unwrap();
+
+        // Create commit
+        let sig = repo.signature().unwrap();
+        let tree_id = index.write_tree().unwrap();
+        let tree = repo.find_tree(tree_id).unwrap();
+        repo.commit(Some("HEAD"), &sig, &sig, "Add test file", &tree, &[])
+            .unwrap();
+
+        let info = RepositoryInfo::from_repo(&repo).unwrap();
+        assert!(info.current_branch.is_some());
+    }
+}

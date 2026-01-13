@@ -212,3 +212,178 @@ impl MergeMode {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    fn create_test_repo() -> (TempDir, Repository) {
+        let temp_dir = TempDir::new().unwrap();
+        let repo = Repository::init(temp_dir.path()).unwrap();
+
+        let mut config = repo.config().unwrap();
+        config.set_str("user.name", "Test User").unwrap();
+        config.set_str("user.email", "test@example.com").unwrap();
+
+        (temp_dir, repo)
+    }
+
+    fn create_initial_commit(temp_dir: &TempDir, repo: &Repository) -> git2::Oid {
+        let file_path = temp_dir.path().join("test.txt");
+        fs::write(&file_path, "initial content").unwrap();
+
+        let mut index = repo.index().unwrap();
+        index.add_path(std::path::Path::new("test.txt")).unwrap();
+        index.write().unwrap();
+
+        let sig = repo.signature().unwrap();
+        let tree_id = index.write_tree().unwrap();
+        let tree = repo.find_tree(tree_id).unwrap();
+
+        repo.commit(Some("HEAD"), &sig, &sig, "Initial commit", &tree, &[])
+            .unwrap()
+    }
+
+    #[test]
+    fn test_branch_kind_equality() {
+        assert_eq!(BranchKind::Local, BranchKind::Local);
+        assert_eq!(BranchKind::Remote, BranchKind::Remote);
+        assert_ne!(BranchKind::Local, BranchKind::Remote);
+    }
+
+    #[test]
+    fn test_branch_kind_clone() {
+        let kind = BranchKind::Local;
+        let cloned = kind;
+        assert_eq!(kind, cloned);
+    }
+
+    #[test]
+    fn test_merge_mode_equality() {
+        assert_eq!(MergeMode::Auto, MergeMode::Auto);
+        assert_eq!(MergeMode::FfOnly, MergeMode::FfOnly);
+        assert_eq!(MergeMode::NoFf, MergeMode::NoFf);
+        assert_eq!(MergeMode::Squash, MergeMode::Squash);
+        assert_ne!(MergeMode::Auto, MergeMode::FfOnly);
+    }
+
+    #[test]
+    fn test_merge_mode_clone() {
+        let mode = MergeMode::Auto;
+        let cloned = mode;
+        assert_eq!(mode, cloned);
+    }
+
+    #[test]
+    fn test_branch_info_creation() {
+        let branch = BranchInfo {
+            name: "main".to_string(),
+            is_head: true,
+            upstream: Some("origin/main".to_string()),
+            branch_type: BranchKind::Local,
+        };
+
+        assert_eq!(branch.name, "main");
+        assert!(branch.is_head);
+        assert_eq!(branch.upstream, Some("origin/main".to_string()));
+        assert_eq!(branch.branch_type, BranchKind::Local);
+    }
+
+    #[test]
+    fn test_remote_branch_info() {
+        let branch = BranchInfo {
+            name: "origin/main".to_string(),
+            is_head: false,
+            upstream: None,
+            branch_type: BranchKind::Remote,
+        };
+
+        assert!(!branch.is_head);
+        assert!(branch.upstream.is_none());
+        assert_eq!(branch.branch_type, BranchKind::Remote);
+    }
+
+    #[test]
+    fn test_branch_info_clone() {
+        let branch = BranchInfo {
+            name: "feature".to_string(),
+            is_head: false,
+            upstream: Some("origin/feature".to_string()),
+            branch_type: BranchKind::Local,
+        };
+
+        let cloned = branch.clone();
+        assert_eq!(branch.name, cloned.name);
+        assert_eq!(branch.is_head, cloned.is_head);
+        assert_eq!(branch.upstream, cloned.upstream);
+        assert_eq!(branch.branch_type, cloned.branch_type);
+    }
+
+    #[test]
+    fn test_get_all_branches() {
+        let (temp_dir, repo) = create_test_repo();
+        create_initial_commit(&temp_dir, &repo);
+
+        let branches = BranchInfo::get_all(&repo).unwrap();
+        assert!(!branches.is_empty());
+        // Should have at least one branch (main or master)
+        assert!(branches.iter().any(|b| b.is_head));
+    }
+
+    #[test]
+    fn test_local_branches() {
+        let (temp_dir, repo) = create_test_repo();
+        create_initial_commit(&temp_dir, &repo);
+
+        let branches = BranchInfo::local_branches(&repo).unwrap();
+        assert!(!branches.is_empty());
+        // All returned branches should be local
+        assert!(branches.iter().all(|b| b.branch_type == BranchKind::Local));
+    }
+
+    #[test]
+    fn test_remote_branches_empty() {
+        let (temp_dir, repo) = create_test_repo();
+        create_initial_commit(&temp_dir, &repo);
+
+        let branches = BranchInfo::remote_branches(&repo).unwrap();
+        // New repo has no remote branches
+        assert!(branches.is_empty());
+    }
+
+    #[test]
+    fn test_branch_sorting_head_first() {
+        let (temp_dir, repo) = create_test_repo();
+        create_initial_commit(&temp_dir, &repo);
+
+        // Create another branch
+        let head_commit = repo.head().unwrap().peel_to_commit().unwrap();
+        repo.branch("z_feature", &head_commit, false).unwrap();
+
+        let branches = BranchInfo::get_all(&repo).unwrap();
+        // HEAD branch should always be first
+        assert!(branches[0].is_head);
+    }
+
+    #[test]
+    fn test_branch_sorting_main_priority() {
+        let (temp_dir, repo) = create_test_repo();
+        create_initial_commit(&temp_dir, &repo);
+
+        let head_commit = repo.head().unwrap().peel_to_commit().unwrap();
+
+        // Create branches with different priorities
+        repo.branch("z_branch", &head_commit, false).unwrap();
+        repo.branch("develop", &head_commit, false).unwrap();
+
+        // Checkout z_branch so main is not HEAD
+        repo.set_head("refs/heads/z_branch").unwrap();
+
+        let branches = BranchInfo::local_branches(&repo).unwrap();
+
+        // z_branch should be first (HEAD), then main/master, then develop, then others
+        assert!(branches[0].is_head);
+    }
+}
