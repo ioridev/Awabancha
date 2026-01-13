@@ -377,11 +377,12 @@ Migration from VibeWithGraph (Tauri + React) to Awabancha (Rust + gpui)
 | Left panel | 🟢 Done | File list + commit form |
 | Right panel | 🟢 Done | Commit graph |
 | Commit graph | 🟢 Done | Visual graph with branches |
-| Diff viewer | 🟢 Done | Line-by-line diff |
-| Settings | 🟢 Done | Auth mode, about |
-| Conflict resolution | 🟢 Done | git2 conflict APIs |
+| Diff viewer | 🟢 Done | Line-by-line diff, modal on double-click |
+| Settings | 🟢 Done | Auth mode, about section, keyboard shortcuts |
+| Conflict resolution | 🟢 Done | git2 conflict APIs, modal dialog |
 | Keyboard shortcuts | 🟢 Done | Actions registered |
 | File watching | 🟢 Done | Auto-refresh on changes |
+| Window focus refresh | 🟢 Done | Auto-refresh on window activation |
 | Drag & Drop | 🟢 Done | Open repos via file drop |
 | i18n | 🔴 Not Started | Future |
 
