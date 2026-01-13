@@ -1,5 +1,7 @@
 # Awabancha
 
+> **Note**: This project is currently under active development. Features may be incomplete or change without notice.
+
 A lightweight Git GUI client built with [gpui](https://github.com/zed-industries/zed/tree/main/crates/gpui).  
 
 <img width="1224" height="1042" alt="image" src="https://github.com/user-attachments/assets/48be0280-4c53-4084-a940-1db0f5872e49" />
