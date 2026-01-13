@@ -16,10 +16,10 @@ impl SettingsView {
 }
 
 impl IntoElement for SettingsView {
-    type Element = Div;
+    type Element = Self;
 
     fn into_element(self) -> Self::Element {
-        div()
+        self
     }
 }
 
@@ -391,10 +391,10 @@ impl SettingsButton {
 }
 
 impl IntoElement for SettingsButton {
-    type Element = Div;
+    type Element = Self;
 
     fn into_element(self) -> Self::Element {
-        div()
+        self
     }
 }
 
@@ -436,10 +436,10 @@ impl MergeButton {
 }
 
 impl IntoElement for MergeButton {
-    type Element = Div;
+    type Element = Self;
 
     fn into_element(self) -> Self::Element {
-        div()
+        self
     }
 }
 
@@ -478,10 +478,10 @@ impl LanguageButton {
 }
 
 impl IntoElement for LanguageButton {
-    type Element = Div;
+    type Element = Self;
 
     fn into_element(self) -> Self::Element {
-        div()
+        self
     }
 }
 
@@ -531,10 +531,10 @@ impl KeyboardShortcut {
 }
 
 impl IntoElement for KeyboardShortcut {
-    type Element = Div;
+    type Element = Self;
 
     fn into_element(self) -> Self::Element {
-        div()
+        self
     }
 }
 

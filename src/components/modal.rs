@@ -18,10 +18,10 @@ impl Modal {
 }
 
 impl IntoElement for Modal {
-    type Element = Div;
+    type Element = Self;
 
     fn into_element(self) -> Self::Element {
-        div()
+        self
     }
 }
 

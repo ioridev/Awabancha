@@ -20,10 +20,10 @@ impl Toast {
 }
 
 impl IntoElement for Toast {
-    type Element = Div;
+    type Element = Self;
 
     fn into_element(self) -> Self::Element {
-        div()
+        self
     }
 }
 
@@ -92,10 +92,10 @@ impl ToastContainer {
 }
 
 impl IntoElement for ToastContainer {
-    type Element = Div;
+    type Element = Self;
 
     fn into_element(self) -> Self::Element {
-        div()
+        self
     }
 }
 

@@ -30,10 +30,10 @@ impl ContextMenuItem {
 }
 
 impl IntoElement for ContextMenuItem {
-    type Element = Div;
+    type Element = Self;
 
     fn into_element(self) -> Self::Element {
-        div()
+        self
     }
 }
 
@@ -73,10 +73,10 @@ impl ContextMenu {
 }
 
 impl IntoElement for ContextMenu {
-    type Element = Div;
+    type Element = Self;
 
     fn into_element(self) -> Self::Element {
-        div()
+        self
     }
 }
 

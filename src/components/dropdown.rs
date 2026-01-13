@@ -35,10 +35,10 @@ impl Dropdown {
 }
 
 impl IntoElement for Dropdown {
-    type Element = Div;
+    type Element = Self;
 
     fn into_element(self) -> Self::Element {
-        div()
+        self
     }
 }
 

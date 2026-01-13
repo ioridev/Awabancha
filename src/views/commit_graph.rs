@@ -568,10 +568,10 @@ impl CommitRow {
 }
 
 impl IntoElement for CommitRow {
-    type Element = Div;
+    type Element = Self;
 
     fn into_element(self) -> Self::Element {
-        div()
+        self
     }
 }
 
@@ -678,10 +678,10 @@ impl GraphNode {
 }
 
 impl IntoElement for GraphNode {
-    type Element = Div;
+    type Element = Self;
 
     fn into_element(self) -> Self::Element {
-        div()
+        self
     }
 }
 

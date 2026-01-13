@@ -246,10 +246,10 @@ impl FileListItem {
 }
 
 impl IntoElement for FileListItem {
-    type Element = Div;
+    type Element = Self;
 
     fn into_element(self) -> Self::Element {
-        div()
+        self
     }
 }
 

@@ -15,10 +15,10 @@ impl DiffViewer {
 }
 
 impl IntoElement for DiffViewer {
-    type Element = Div;
+    type Element = Self;
 
     fn into_element(self) -> Self::Element {
-        div()
+        self
     }
 }
 
@@ -122,10 +122,10 @@ impl DiffLine {
 }
 
 impl IntoElement for DiffLine {
-    type Element = Div;
+    type Element = Self;
 
     fn into_element(self) -> Self::Element {
-        div()
+        self
     }
 }
 

@@ -217,10 +217,10 @@ impl SearchResultItem {
 }
 
 impl IntoElement for SearchResultItem {
-    type Element = Div;
+    type Element = Self;
 
     fn into_element(self) -> Self::Element {
-        div()
+        self
     }
 }
 

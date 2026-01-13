@@ -49,10 +49,10 @@ impl WelcomeView {
 }
 
 impl IntoElement for WelcomeView {
-    type Element = Div;
+    type Element = Self;
 
     fn into_element(self) -> Self::Element {
-        div()
+        self
     }
 }
 
