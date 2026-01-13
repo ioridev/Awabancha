@@ -366,12 +366,13 @@ Migration from VibeWithGraph (Tauri + React) to Awabancha (Rust + gpui)
 |---------|--------|-------|
 | Project setup | 🟢 Done | Cargo.toml, directory structure |
 | App bootstrap | 🟢 Done | main.rs, app.rs with gpui |
-| Welcome screen | 🟢 Done | Recent projects, open button |
+| Welcome screen | 🟢 Done | Recent projects, open button, drag-drop |
 | Git repository ops | 🟢 Done | git2 integration |
 | File status ops | 🟢 Done | stage/unstage/discard |
 | Commit ops | 🟢 Done | create/amend |
 | Branch ops | 🟢 Done | checkout/create/delete |
 | Remote ops | 🟢 Done | push/pull/fetch |
+| Advanced ops | 🟢 Done | revert/cherry-pick/reset |
 | Main layout | 🟢 Done | 3-panel with header |
 | Left panel | 🟢 Done | File list + commit form |
 | Right panel | 🟢 Done | Commit graph |
@@ -380,7 +381,8 @@ Migration from VibeWithGraph (Tauri + React) to Awabancha (Rust + gpui)
 | Settings | 🟢 Done | Auth mode, about |
 | Conflict resolution | 🟢 Done | git2 conflict APIs |
 | Keyboard shortcuts | 🟢 Done | Actions registered |
-| File watching | 🟡 Partial | notify crate added, watcher TBD |
+| File watching | 🟢 Done | Auto-refresh on changes |
+| Drag & Drop | 🟢 Done | Open repos via file drop |
 | i18n | 🔴 Not Started | Future |
 
 **Legend:** 🟢 Done | 🟡 Partial | 🔴 Not Started
