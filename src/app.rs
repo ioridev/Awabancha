@@ -1,9 +1,10 @@
 use crate::actions::*;
-use crate::state::{GitState, RecentProjects, SettingsState};
+use crate::state::{GitState, RecentProjects, RepositoryWatcher, SettingsState};
 use crate::views::{MainLayout, WelcomeView};
 use gpui::prelude::*;
 use gpui::*;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 pub struct Assets;
 
@@ -30,6 +31,8 @@ pub struct Awabancha {
     pub show_settings: bool,
     /// Main layout entity (created when repository is opened)
     main_layout: Option<Entity<MainLayout>>,
+    /// File system watcher for auto-refresh
+    watcher: Arc<Mutex<RepositoryWatcher>>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -52,6 +55,7 @@ impl Awabancha {
             view_mode: ViewMode::Welcome,
             show_settings: false,
             main_layout: None,
+            watcher: Arc::new(Mutex::new(RepositoryWatcher::new())),
         }
     }
 
@@ -81,12 +85,68 @@ impl Awabancha {
         let settings = self.settings.clone();
         self.main_layout = Some(cx.new(|cx| MainLayout::new(git_state, settings, cx)));
 
+        // Start file watcher
+        self.start_watching(path.clone(), cx);
+
         self.repository_path = Some(path);
         self.view_mode = ViewMode::Repository;
         cx.notify();
     }
 
+    fn start_watching(&self, path: PathBuf, cx: &mut Context<Self>) {
+        // Start the watcher
+        if let Ok(mut watcher) = self.watcher.lock() {
+            if let Err(e) = watcher.watch(path) {
+                log::warn!("Failed to start file watcher: {}", e);
+            }
+        }
+
+        // Spawn a background task to poll for changes
+        let watcher = self.watcher.clone();
+        let git_state = self.git_state.clone();
+
+        cx.spawn(async move |this, cx| {
+            loop {
+                // Sleep for a bit
+                cx.background_executor()
+                    .timer(std::time::Duration::from_millis(500))
+                    .await;
+
+                // Check if watcher detected changes
+                let should_refresh = watcher
+                    .lock()
+                    .map(|w| w.poll())
+                    .unwrap_or(false);
+
+                if should_refresh {
+                    let _ = this.update(cx, |_app, cx| {
+                        git_state.update(cx, |state, cx| {
+                            state.refresh(cx);
+                        });
+                    });
+                }
+
+                // Check if we should stop (repository closed)
+                let should_stop = this
+                    .update(cx, |app, _cx| {
+                        app.view_mode == ViewMode::Welcome
+                    })
+                    .unwrap_or(true);
+
+                if should_stop {
+                    break;
+                }
+            }
+        })
+        .detach();
+    }
+
     pub fn close_repository(&mut self, cx: &mut Context<Self>) {
+        // Stop the watcher
+        if let Ok(mut watcher) = self.watcher.lock() {
+            watcher.stop();
+        }
+
         self.git_state.update(cx, |state, cx| {
             state.close_repository(cx);
         });
