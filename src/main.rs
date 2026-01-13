@@ -32,7 +32,7 @@ fn main() {
                 }),
                 ..Default::default()
             },
-            |_window, cx| cx.new(|cx| Awabancha::new(cx)),
+            |window, cx| cx.new(|cx| Awabancha::new(window, cx)),
         )
         .expect("Failed to open window");
 

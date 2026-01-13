@@ -48,10 +48,22 @@ pub enum ViewMode {
 }
 
 impl Awabancha {
-    pub fn new(cx: &mut Context<Self>) -> Self {
+    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let git_state = cx.new(|_| GitState::new());
         let settings = cx.new(|cx| SettingsState::load(cx));
         let recent_projects = cx.new(|cx| RecentProjects::load(cx));
+
+        // Set up window activation observer for auto-refresh
+        let git_state_for_activation = git_state.clone();
+        cx.observe_window_activation(window, move |app, _window, cx| {
+            // Only refresh when window becomes active and repository is open
+            if app.view_mode == ViewMode::Repository {
+                git_state_for_activation.update(cx, |state, cx| {
+                    state.refresh(cx);
+                });
+            }
+        })
+        .detach();
 
         Self {
             repository_path: None,
