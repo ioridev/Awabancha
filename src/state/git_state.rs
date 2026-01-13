@@ -398,6 +398,51 @@ impl GitState {
         )
     }
 
+    // Tag operations
+    pub fn create_tag(
+        &mut self,
+        name: &str,
+        sha: &str,
+        message: Option<&str>,
+        cx: &mut Context<Self>,
+    ) -> Result<()> {
+        self.with_repo_mut(
+            |repo| {
+                if let Some(msg) = message {
+                    TagInfo::create_annotated(repo, name, Some(sha), msg)?;
+                } else {
+                    TagInfo::create_lightweight(repo, name, Some(sha))?;
+                }
+                Ok(())
+            },
+            cx,
+        )?;
+        // Refresh tag list
+        if let Some(path) = &self.path {
+            let repo = git2::Repository::open(path)?;
+            self.tags = TagInfo::get_all(&repo)?;
+            cx.notify();
+        }
+        Ok(())
+    }
+
+    pub fn delete_tag(&mut self, name: &str, cx: &mut Context<Self>) -> Result<()> {
+        self.with_repo_mut(
+            |repo| {
+                TagInfo::delete(repo, name)?;
+                Ok(())
+            },
+            cx,
+        )?;
+        // Refresh tag list
+        if let Some(path) = &self.path {
+            let repo = git2::Repository::open(path)?;
+            self.tags = TagInfo::get_all(&repo)?;
+            cx.notify();
+        }
+        Ok(())
+    }
+
     // Stash operations
     pub fn stash_save(&mut self, message: Option<&str>, cx: &mut Context<Self>) -> Result<()> {
         if let Some(path) = &self.path {

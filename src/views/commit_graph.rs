@@ -82,6 +82,18 @@ impl CommitGraph {
         self.hide_context_menu(cx);
     }
 
+    fn create_tag_at(&mut self, sha: &str, _window: &mut Window, cx: &mut Context<Self>) {
+        // For now, create a tag with a default name
+        // TODO: Show dialog to input tag name and message
+        let tag_name = format!("tag-{}", &sha[..7]);
+        self.git_state.update(cx, |state, cx| {
+            if let Err(e) = state.create_tag(&tag_name, sha, None, cx) {
+                log::error!("Failed to create tag: {}", e);
+            }
+        });
+        self.hide_context_menu(cx);
+    }
+
     fn cherry_pick(&mut self, sha: &str, _window: &mut Window, cx: &mut Context<Self>) {
         self.git_state.update(cx, |state, cx| {
             if let Err(e) = state.cherry_pick(sha, cx) {
@@ -190,6 +202,7 @@ impl CommitGraph {
         let sha = menu.sha.clone();
         let sha_checkout = sha.clone();
         let sha_branch = sha.clone();
+        let sha_tag = sha.clone();
         let sha_cherry = sha.clone();
         let sha_revert = sha.clone();
         let sha_reset_soft = sha.clone();
@@ -238,6 +251,21 @@ impl CommitGraph {
                     .child("Create Branch")
                     .on_click(cx.listener(move |this, _event, window, cx| {
                         this.create_branch_from(&sha_branch, window, cx);
+                    })),
+            )
+            // Create tag
+            .child(
+                div()
+                    .id("ctx-tag")
+                    .px_3()
+                    .py_2()
+                    .text_sm()
+                    .text_color(rgb(0xcdd6f4))
+                    .cursor_pointer()
+                    .hover(|s| s.bg(rgb(0x313244)))
+                    .child("Create Tag")
+                    .on_click(cx.listener(move |this, _event, window, cx| {
+                        this.create_tag_at(&sha_tag, window, cx);
                     })),
             )
             // Separator
