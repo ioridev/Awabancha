@@ -195,8 +195,11 @@ static EN_TRANSLATIONS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock
         ("time.today", "Today"),
         ("time.yesterday", "Yesterday"),
         ("time.daysAgo", "{days} days ago"),
+        ("time.weekAgo", "1 week ago"),
         ("time.weeksAgo", "{weeks} weeks ago"),
+        ("time.monthAgo", "1 month ago"),
         ("time.monthsAgo", "{months} months ago"),
+        ("time.yearAgo", "1 year ago"),
         ("time.yearsAgo", "{years} years ago"),
 
         // Header
@@ -397,8 +400,11 @@ static JA_TRANSLATIONS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock
         ("time.today", "今日"),
         ("time.yesterday", "昨日"),
         ("time.daysAgo", "{days}日前"),
+        ("time.weekAgo", "1週間前"),
         ("time.weeksAgo", "{weeks}週間前"),
+        ("time.monthAgo", "1ヶ月前"),
         ("time.monthsAgo", "{months}ヶ月前"),
+        ("time.yearAgo", "1年前"),
         ("time.yearsAgo", "{years}年前"),
 
         // Header
@@ -599,8 +605,11 @@ static ZH_HANS_TRANSLATIONS: LazyLock<HashMap<&'static str, &'static str>> = Laz
         ("time.today", "今天"),
         ("time.yesterday", "昨天"),
         ("time.daysAgo", "{days} 天前"),
+        ("time.weekAgo", "1 周前"),
         ("time.weeksAgo", "{weeks} 周前"),
+        ("time.monthAgo", "1 个月前"),
         ("time.monthsAgo", "{months} 个月前"),
+        ("time.yearAgo", "1 年前"),
         ("time.yearsAgo", "{years} 年前"),
 
         // Header
@@ -801,8 +810,11 @@ static ZH_HANT_TRANSLATIONS: LazyLock<HashMap<&'static str, &'static str>> = Laz
         ("time.today", "今天"),
         ("time.yesterday", "昨天"),
         ("time.daysAgo", "{days} 天前"),
+        ("time.weekAgo", "1 週前"),
         ("time.weeksAgo", "{weeks} 週前"),
+        ("time.monthAgo", "1 個月前"),
         ("time.monthsAgo", "{months} 個月前"),
+        ("time.yearAgo", "1 年前"),
         ("time.yearsAgo", "{years} 年前"),
 
         // Header
