@@ -89,13 +89,25 @@ pub fn format_relative_time(locale: Locale, days: i64) -> String {
         t_with_vars(locale, "time.daysAgo", &[("days", &days.to_string())])
     } else if days < 30 {
         let weeks = days / 7;
-        t_with_vars(locale, "time.weeksAgo", &[("weeks", &weeks.to_string())])
+        if weeks == 1 {
+            t(locale, "time.weekAgo")
+        } else {
+            t_with_vars(locale, "time.weeksAgo", &[("weeks", &weeks.to_string())])
+        }
     } else if days < 365 {
         let months = days / 30;
-        t_with_vars(locale, "time.monthsAgo", &[("months", &months.to_string())])
+        if months == 1 {
+            t(locale, "time.monthAgo")
+        } else {
+            t_with_vars(locale, "time.monthsAgo", &[("months", &months.to_string())])
+        }
     } else {
         let years = days / 365;
-        t_with_vars(locale, "time.yearsAgo", &[("years", &years.to_string())])
+        if years == 1 {
+            t(locale, "time.yearAgo")
+        } else {
+            t_with_vars(locale, "time.yearsAgo", &[("years", &years.to_string())])
+        }
     }
 }
 
@@ -206,6 +218,18 @@ mod tests {
     #[test]
     fn test_format_relative_time_years() {
         let result = format_relative_time(Locale::En, 400);
-        assert_eq!(result, "1 years ago");
+        assert_eq!(result, "1 year ago");
+    }
+
+    #[test]
+    fn test_format_relative_time_singular_week() {
+        let result = format_relative_time(Locale::En, 7);
+        assert_eq!(result, "1 week ago");
+    }
+
+    #[test]
+    fn test_format_relative_time_singular_month() {
+        let result = format_relative_time(Locale::En, 30);
+        assert_eq!(result, "1 month ago");
     }
 }
