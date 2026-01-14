@@ -149,10 +149,10 @@ mod tests {
     #[test]
     fn test_storage_path_is_some() {
         let path = RecentProjects::storage_path();
-        if let Some(p) = path {
-            assert!(p.to_string_lossy().contains("awabancha"));
-            assert!(p.to_string_lossy().contains("recent_projects"));
-        }
+        assert!(path.is_some(), "Storage path should be available in test environment");
+        let p = path.unwrap();
+        assert!(p.to_string_lossy().contains("awabancha"));
+        assert!(p.ends_with("recent_projects.json"));
     }
 
     #[test]

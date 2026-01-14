@@ -239,11 +239,10 @@ mod tests {
     #[test]
     fn test_settings_path_is_some() {
         // settings_path should return Some on systems with a config directory
-        // This might fail on some CI systems, but should work locally
         let path = SettingsState::settings_path();
-        // We just test that it doesn't panic and returns a reasonable result
-        if let Some(p) = path {
-            assert!(p.to_string_lossy().contains("awabancha"));
-        }
+        assert!(path.is_some(), "Settings path should be available in test environment");
+        let p = path.unwrap();
+        assert!(p.to_string_lossy().contains("awabancha"));
+        assert!(p.ends_with("settings.json"));
     }
 }

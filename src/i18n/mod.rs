@@ -194,18 +194,18 @@ mod tests {
     #[test]
     fn test_format_relative_time_weeks() {
         let result = format_relative_time(Locale::En, 14);
-        assert!(result.contains("2")); // 2 weeks
+        assert_eq!(result, "2 weeks ago");
     }
 
     #[test]
     fn test_format_relative_time_months() {
         let result = format_relative_time(Locale::En, 60);
-        assert!(result.contains("2")); // 2 months
+        assert_eq!(result, "2 months ago");
     }
 
     #[test]
     fn test_format_relative_time_years() {
         let result = format_relative_time(Locale::En, 400);
-        assert!(result.contains("1")); // 1 year
+        assert_eq!(result, "1 years ago");
     }
 }

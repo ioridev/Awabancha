@@ -77,7 +77,7 @@ impl FileDiff {
 
     /// Get short path for display (basename)
     pub fn short_path(&self) -> &str {
-        self.path.rsplit('/').next().unwrap_or(&self.path)
+        std::path::Path::new(&self.path).file_name().and_then(|s| s.to_str()).unwrap_or(&self.path)
     }
 
     fn from_diff(diff: &git2::Diff, target_path: &str) -> Result<Self> {

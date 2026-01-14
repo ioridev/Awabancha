@@ -384,6 +384,10 @@ mod tests {
         let branches = BranchInfo::local_branches(&repo).unwrap();
 
         // z_branch should be first (HEAD), then main/master, then develop, then others
+        assert_eq!(branches.len(), 3);
         assert!(branches[0].is_head);
+        assert_eq!(branches[0].name, "z_branch");
+        assert!(branches[1].name == "main" || branches[1].name == "master");
+        assert_eq!(branches[2].name, "develop");
     }
 }
